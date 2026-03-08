@@ -1,0 +1,867 @@
+import { useState, useEffect, useCallback, Component } from "react";
+
+// ─── Supabase REST Client (no external library needed) ────────────────────────
+const SB_URL = "https://hdnbrarxisehdmqtswqq.supabase.co";
+const SB_KEY = "sb_publishable_33k36-AzfxfkTyK5V4IQIg_7QAfbQbY";
+
+// All Supabase calls go through this one fetch wrapper
+async function sb(path, options = {}) {
+  const { method = "GET", body, token, params } = options;
+  let url = `${SB_URL}/rest/v1/${path}`;
+  if (params) {
+    const qs = Object.entries(params)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+      .join("&");
+    url += "?" + qs;
+  }
+  const headers = {
+    "apikey": SB_KEY,
+    "Content-Type": "application/json",
+    "Prefer": "return=representation",
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  else        headers["Authorization"] = `Bearer ${SB_KEY}`;
+
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!res.ok) return { error: data?.message || data?.error || `Error ${res.status}`, data: null };
+  return { data, error: null };
+}
+
+// Auth calls go to a different endpoint
+async function sbAuth(path, body) {
+  const res = await fetch(`${SB_URL}/auth/v1/${path}`, {
+    method: "POST",
+    headers: { "apikey": SB_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) return { error: data?.error_description || data?.msg || data?.message || "Auth error", data: null };
+  return { data, error: null };
+}
+
+// Persistent session in memory (survives re-renders, resets on page refresh)
+// For true persistence across refreshes, swap with localStorage in your own deployment
+let _session = null;
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const VALID_CATS = ["Tech", "Sports", "Social", "Education", "Entrepreneurship"];
+const ALL_CATS   = ["All", ...VALID_CATS];
+const CAT_ICON   = { Tech:"⚡", Sports:"🏃", Social:"🎉", Education:"📚", Entrepreneurship:"🚀" };
+const PAGE_SIZE  = 9;
+
+function todayMin() {
+  const d  = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}T00:00`;
+}
+const DATE_MAX = "2030-12-31T23:59";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const fmtDate = s => { try { return new Date(s).toLocaleDateString("en-US", { weekday:"short", month:"short", day:"numeric", year:"numeric" }); } catch { return ""; } };
+const fmtTime = s => { try { return new Date(s).toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit" }); } catch { return ""; } };
+const capPct  = (n, m) => Math.min(100, m > 0 ? Math.round((n / m) * 100) : 0);
+const trunc   = (s, n = 120) => String(s || "").trim().slice(0, n);
+const wrap    = async (fn, fallback) => { try { return await fn(); } catch (e) { console.error(e); return fallback; } };
+
+// ─── DB Layer ─────────────────────────────────────────────────────────────────
+const db = {
+
+  async signUp(name, email, password) {
+    return wrap(async () => {
+      name  = String(name  || "").trim().slice(0, 100);
+      email = String(email || "").trim().toLowerCase();
+      if (!name)  return { error: "Name is required." };
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email." };
+      if (String(password || "").length < 6) return { error: "Password must be 6+ characters." };
+
+      // Create auth user
+      const { data: auth, error: authErr } = await sbAuth("signup", { email, password });
+      if (authErr) return { error: authErr };
+
+      const token = auth.access_token;
+      _session = { id: auth.user.id, email, name, token };
+
+      // Save profile in users table
+      await sb("users", {
+        method: "POST",
+        token,
+        body: { id: auth.user.id, name, email },
+      });
+
+      return { data: _session };
+    }, { error: "Sign up failed. Please try again." });
+  },
+
+  async signIn(email, password) {
+    return wrap(async () => {
+      email = String(email || "").trim().toLowerCase();
+      if (!email)    return { error: "Email is required." };
+      if (!password) return { error: "Password is required." };
+
+      const { data: auth, error } = await sbAuth("token?grant_type=password", { email, password });
+      if (error) return { error };
+
+      const token = auth.access_token;
+
+      // Fetch profile name
+      const { data: profile } = await sb(`users?id=eq.${auth.user.id}&select=name`, { token });
+      const name = profile?.[0]?.name || "User";
+
+      _session = { id: auth.user.id, email, name, token };
+      return { data: _session };
+    }, { error: "Sign in failed. Please try again." });
+  },
+
+  signOut() { _session = null; },
+  getSession() { return _session; },
+
+  async getEvents(category, page = 0, search = "") {
+    return wrap(async () => {
+      const from  = page * PAGE_SIZE;
+      const to    = from + PAGE_SIZE - 1;
+
+      // Build query params
+      const params = { select: "id,title,description,date,location,category,host_id,max_participants,created_at,users(name)", order: "created_at.desc" };
+      let path = "events";
+
+      // Use fetch directly for more complex filtering
+      let url = `${SB_URL}/rest/v1/events?select=id,title,description,date,location,category,host_id,max_participants,created_at,users(name)&order=created_at.desc`;
+      if (category && category !== "All") url += `&category=eq.${encodeURIComponent(category)}`;
+      if (search?.trim()) url += `&title=ilike.${encodeURIComponent("*" + search.trim() + "*")}`;
+      url += `&offset=${from}&limit=${PAGE_SIZE}`;
+
+      const res = await fetch(url, {
+        headers: {
+          "apikey": SB_KEY,
+          "Authorization": `Bearer ${_session?.token || SB_KEY}`,
+          "Prefer": "count=exact",
+        },
+      });
+      const total = parseInt(res.headers.get("content-range")?.split("/")[1] || "0");
+      const data  = await res.json();
+
+      if (!res.ok) return { data: [], total: 0 };
+
+      // Get attendee counts for this batch
+      const ids = (data || []).map(e => `"${e.id}"`).join(",");
+      let countMap = {};
+      if (ids.length) {
+        const attRes = await fetch(
+          `${SB_URL}/rest/v1/event_attendees?select=event_id&event_id=in.(${ids})`,
+          { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session?.token || SB_KEY}` } }
+        );
+        const att = await attRes.json();
+        (att || []).forEach(r => { countMap[r.event_id] = (countMap[r.event_id] || 0) + 1; });
+      }
+
+      const events = (data || []).map(e => ({
+        ...e,
+        host_name: e.users?.name || "Unknown",
+        attendee_count: countMap[e.id] || 0,
+      }));
+      return { data: events, total };
+    }, { data: [], total: 0 });
+  },
+
+  async getEvent(id) {
+    return wrap(async () => {
+      const { data, error } = await sb(`events?id=eq.${id}&select=id,title,description,date,location,category,host_id,max_participants,created_at,users(name)`, {
+        token: _session?.token,
+      });
+      if (error || !data?.[0]) return null;
+      const event = data[0];
+
+      // Get attendee count
+      const countRes = await fetch(
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${id}&select=id`,
+        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session?.token || SB_KEY}`, "Prefer": "count=exact" } }
+      );
+      const count = parseInt(countRes.headers.get("content-range")?.split("/")[1] || "0");
+
+      return { ...event, host_name: event.users?.name || "Unknown", attendee_count: count };
+    }, null);
+  },
+
+  async createEvent(data, userId) {
+    return wrap(async () => {
+      if (!_session?.token) return { error: "You must be signed in." };
+
+      const title       = String(data.title       || "").trim().slice(0, 200);
+      const description = String(data.description || "").trim().slice(0, 2000);
+      const location    = String(data.location    || "").trim().slice(0, 300);
+      const category    = VALID_CATS.includes(data.category) ? data.category : "Social";
+      const maxP        = Math.max(1, Math.min(10000, parseInt(data.max_participants) || 50));
+
+      if (!title)       return { error: "Title is required." };
+      if (!description) return { error: "Description is required." };
+      if (!location)    return { error: "Location is required." };
+      if (!data.date)   return { error: "Date is required." };
+
+      const d = new Date(data.date);
+      if (isNaN(d.getTime()))         return { error: "Invalid date." };
+      if (d < new Date())             return { error: "Date cannot be in the past." };
+      if (d > new Date("2030-12-31")) return { error: "Date cannot exceed 2030." };
+
+      const { data: event, error } = await sb("events", {
+        method: "POST",
+        token: _session.token,
+        body: { title, description, location, category, date: d.toISOString(), max_participants: maxP, host_id: userId },
+      });
+      if (error) return { error };
+      return { data: Array.isArray(event) ? event[0] : event };
+    }, { error: "Could not create event. Please try again." });
+  },
+
+  async joinEvent(eventId, userId) {
+    return wrap(async () => {
+      if (!_session?.token) return { error: "Sign in required." };
+
+      // Check capacity
+      const ev = await db.getEvent(eventId);
+      if (ev && ev.attendee_count >= ev.max_participants) return { error: "This event is full." };
+
+      const { error } = await sb("event_attendees", {
+        method: "POST",
+        token: _session.token,
+        body: { event_id: eventId, user_id: userId },
+      });
+      if (error) return { error: error.includes("duplicate") || error.includes("unique") ? "You already joined this event." : error };
+      return { data: true };
+    }, { error: "Could not join event." });
+  },
+
+  async leaveEvent(eventId, userId) {
+    return wrap(async () => {
+      if (!_session?.token) return { error: "Sign in required." };
+      const res = await fetch(
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}`,
+        {
+          method: "DELETE",
+          headers: {
+            "apikey": SB_KEY,
+            "Authorization": `Bearer ${_session.token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      if (!res.ok) return { error: "Could not leave event." };
+      return { data: true };
+    }, { error: "Could not leave event." });
+  },
+
+  async isJoined(eventId, userId) {
+    return wrap(async () => {
+      const res = await fetch(
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}&select=id`,
+        {
+          headers: {
+            "apikey": SB_KEY,
+            "Authorization": `Bearer ${_session?.token || SB_KEY}`,
+            "Prefer": "count=exact",
+          },
+        }
+      );
+      const count = parseInt(res.headers.get("content-range")?.split("/")[1] || "0");
+      return count > 0;
+    }, false);
+  },
+
+  async getMyEvents(userId) {
+    return wrap(async () => {
+      const token = _session?.token || SB_KEY;
+
+      // Get joined event IDs
+      const attRes = await fetch(
+        `${SB_URL}/rest/v1/event_attendees?user_id=eq.${userId}&select=event_id`,
+        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${token}` } }
+      );
+      const att = await attRes.json();
+      const joinedIds = (att || []).map(a => a.event_id);
+
+      const [joinedRes, createdRes] = await Promise.all([
+        joinedIds.length
+          ? fetch(`${SB_URL}/rest/v1/events?id=in.(${joinedIds.map(i => `"${i}"`).join(",")})&select=id,title,description,date,location,category,host_id,max_participants,created_at,users(name)&order=created_at.desc`,
+              { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${token}` } }).then(r => r.json())
+          : Promise.resolve([]),
+        fetch(`${SB_URL}/rest/v1/events?host_id=eq.${userId}&select=id,title,description,date,location,category,host_id,max_participants,created_at,users(name)&order=created_at.desc`,
+          { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${token}` } }).then(r => r.json()),
+      ]);
+
+      const fmt = arr => (Array.isArray(arr) ? arr : []).map(e => ({
+        ...e, host_name: e.users?.name || "Unknown", attendee_count: 0,
+      }));
+      return { joined: fmt(joinedRes), created: fmt(createdRes) };
+    }, { joined: [], created: [] });
+  },
+
+  async getStats() {
+    return wrap(async () => {
+      const [evRes, attRes, catRes] = await Promise.all([
+        fetch(`${SB_URL}/rest/v1/events?select=id`, { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Prefer": "count=exact" } }),
+        fetch(`${SB_URL}/rest/v1/event_attendees?select=id`, { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Prefer": "count=exact" } }),
+        fetch(`${SB_URL}/rest/v1/events?select=category`, { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }),
+      ]);
+      const totalEvents = parseInt(evRes.headers.get("content-range")?.split("/")[1] || "0");
+      const totalJoins  = parseInt(attRes.headers.get("content-range")?.split("/")[1] || "0");
+      const cats        = await catRes.json();
+      const counts = {};
+      (cats || []).forEach(e => { counts[e.category] = (counts[e.category] || 0) + 1; });
+      const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
+      return { totalEvents, totalJoins, topCategory: top };
+    }, { totalEvents: 0, totalJoins: 0, topCategory: "—" });
+  },
+};
+
+// ─── Error Boundary ───────────────────────────────────────────────────────────
+class ErrorBoundary extends Component {
+  constructor(p) { super(p); this.state = { crashed: false, msg: "" }; }
+  static getDerivedStateFromError(e) { return { crashed: true, msg: e?.message || "Unknown error" }; }
+  componentDidCatch(e, i) { console.error("[UniVibe]", e, i); }
+  render() {
+    if (this.state.crashed) return (
+      <div style={{ padding:40, textAlign:"center", color:"#8892a4", fontFamily:"sans-serif" }}>
+        <div style={{ fontSize:40, marginBottom:10 }}>⚠️</div>
+        <h3 style={{ color:"#e8eaf0", marginBottom:8 }}>Something went wrong</h3>
+        <p style={{ fontSize:14, marginBottom:18 }}>{this.state.msg}</p>
+        <button onClick={() => this.setState({ crashed:false })}
+          style={{ background:"#f59e0b", border:"none", color:"#fff", padding:"9px 20px", borderRadius:8, cursor:"pointer", fontWeight:600 }}>
+          Try Again
+        </button>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const css = `
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:#0a0f1e; --bg2:#111827; --bg3:#1a2235; --bg4:#242d42;
+    --amber:#f59e0b; --coral:#f97316; --rose:#fb7185; --green:#34d399;
+    --text:#e8eaf0; --muted:#8892a4; --border:rgba(255,255,255,0.07);
+    --card:rgba(18,24,40,0.92); --r:14px; --rs:9px;
+  }
+  html { scroll-behavior:smooth; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; overflow-x:hidden; }
+  body::before { content:''; position:fixed; inset:0; z-index:-1;
+    background:radial-gradient(ellipse 70% 45% at 15% 10%,rgba(245,158,11,0.07) 0%,transparent 55%),
+               radial-gradient(ellipse 55% 40% at 85% 85%,rgba(249,115,22,0.05) 0%,transparent 55%),var(--bg); }
+  ::-webkit-scrollbar{width:5px} ::-webkit-scrollbar-track{background:var(--bg2)} ::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+  .app{min-height:100vh;display:flex;flex-direction:column}
+  .container{max-width:1160px;margin:0 auto;padding:0 18px;width:100%}
+
+  .nav{position:sticky;top:0;z-index:100;background:rgba(10,15,30,0.9);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+  .nav-inner{max-width:1160px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 18px}
+  .logo{display:flex;align-items:center;gap:9px;cursor:pointer}
+  .logo-mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--amber),var(--coral));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:15px;color:#fff;box-shadow:0 0 16px rgba(245,158,11,0.32);flex-shrink:0}
+  .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:20px;letter-spacing:-0.5px}
+  .logo-text span{color:var(--amber)}
+  .nav-links{display:flex;align-items:center;gap:3px}
+  .nb{background:none;border:none;cursor:pointer;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;padding:6px 12px;border-radius:var(--rs);transition:all 0.16s}
+  .nb:hover,.nb.on{color:var(--text);background:var(--bg3)}
+  .nb.cta{background:linear-gradient(135deg,var(--amber),var(--coral));color:#fff;font-weight:600}
+  .nb.cta:hover{opacity:.88;transform:translateY(-1px);box-shadow:0 4px 14px rgba(245,158,11,0.28)}
+  .nb.out{border:1px solid var(--border);color:var(--text)}
+  .nb.out:hover{border-color:rgba(245,158,11,0.38);color:var(--amber)}
+  .avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--amber),var(--coral));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff;cursor:pointer;border:2px solid transparent;transition:border-color 0.16s;flex-shrink:0}
+  .avatar:hover{border-color:var(--amber)}
+  .ham{display:none;flex-direction:column;gap:5px;cursor:pointer;padding:4px}
+  .ham span{display:block;width:19px;height:2px;background:var(--text);border-radius:2px}
+  .mmenu{display:none;flex-direction:column;gap:3px;padding:9px 14px 13px;background:rgba(10,15,30,0.97);border-bottom:1px solid var(--border)}
+  .mmenu.open{display:flex} .mmenu .nb{text-align:left}
+
+  .page{padding:32px 0 56px;animation:fadeUp 0.32s ease}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+  .hero{padding:52px 0 32px;text-align:center}
+  .hero-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(245,158,11,0.09);border:1px solid rgba(245,158,11,0.2);padding:5px 13px;border-radius:100px;font-size:12px;color:var(--amber);font-weight:500;margin-bottom:16px}
+  .hero h1{font-family:'Syne',sans-serif;font-size:clamp(30px,5.5vw,58px);font-weight:800;line-height:1.1;letter-spacing:-1px;margin-bottom:12px}
+  .hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--amber),var(--coral));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  .hero p{font-size:16px;color:var(--muted);max-width:440px;margin:0 auto 26px;line-height:1.6}
+  .hero-btns{display:flex;gap:9px;justify-content:center;flex-wrap:wrap}
+
+  .stats{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:28px 0}
+  .scard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px 24px;text-align:center;backdrop-filter:blur(10px);transition:transform 0.18s,border-color 0.18s}
+  .scard:hover{transform:translateY(-2px);border-color:rgba(245,158,11,0.16)}
+  .snum{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--amber)}
+  .slbl{font-size:11px;color:var(--muted);margin-top:3px}
+
+  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
+  .pill{background:var(--bg3);border:1px solid transparent;color:var(--muted);padding:5px 14px;border-radius:100px;font-size:12px;font-weight:500;cursor:pointer;transition:all 0.16s}
+  .pill:hover{color:var(--text);border-color:var(--border)}
+  .pill.on{background:linear-gradient(135deg,var(--amber),var(--coral));color:#fff}
+
+  .sbar{display:flex;align-items:center;gap:8px;background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--rs);padding:8px 14px;margin-bottom:18px;transition:border-color 0.16s}
+  .sbar:focus-within{border-color:rgba(245,158,11,0.45)}
+  .sbar input{background:none;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;flex:1}
+  .sbar input::placeholder{color:var(--muted)}
+  .sbar-x{background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;padding:0 2px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+
+  .ecard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:transform 0.2s,border-color 0.2s,box-shadow 0.2s;backdrop-filter:blur(10px)}
+  .ecard:hover{transform:translateY(-4px);border-color:rgba(245,158,11,0.17);box-shadow:0 10px 32px rgba(0,0,0,0.26)}
+  .ecard-head{padding:16px 16px 0;display:flex;justify-content:space-between;align-items:flex-start}
+  .ctag{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:600;background:rgba(245,158,11,0.09);color:var(--amber);border:1px solid rgba(245,158,11,0.17)}
+  .ctag.Sports{background:rgba(52,211,153,0.09);color:var(--green);border-color:rgba(52,211,153,0.17)}
+  .ctag.Social{background:rgba(251,113,133,0.09);color:var(--rose);border-color:rgba(251,113,133,0.17)}
+  .ctag.Education{background:rgba(250,204,21,0.09);color:#facc15;border-color:rgba(250,204,21,0.17)}
+  .ctag.Entrepreneurship{background:rgba(249,115,22,0.09);color:var(--coral);border-color:rgba(249,115,22,0.17)}
+  .badge-new{background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.2);color:var(--green);padding:2px 7px;border-radius:100px;font-size:9px;font-weight:700;letter-spacing:0.5px}
+  .ecard-body{padding:11px 16px 16px}
+  .etitle{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:9px;line-height:1.3}
+  .emeta{display:flex;flex-direction:column;gap:3px;margin-bottom:11px}
+  .emr{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+  .cbar{height:3px;background:var(--bg4);border-radius:2px;margin-bottom:11px;overflow:hidden}
+  .cfill{height:100%;border-radius:2px}
+  .c-g{background:var(--green)}.c-a{background:var(--amber)}.c-o{background:var(--coral)}.c-r{background:var(--rose)}
+  .efoot{display:flex;align-items:center;justify-content:space-between}
+  .ecnt{font-size:11px;color:var(--muted)}
+
+  .btn{display:inline-flex;align-items:center;gap:5px;padding:7px 16px;border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.16s;border:none}
+  .btn:disabled{opacity:.42;cursor:not-allowed}
+  .bp{background:linear-gradient(135deg,var(--amber),var(--coral));color:#fff}
+  .bp:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 18px rgba(245,158,11,0.28)}
+  .bo{background:none;border:1.5px solid var(--border);color:var(--text)}
+  .bo:hover{border-color:rgba(245,158,11,0.38);color:var(--amber)}
+  .bg{background:var(--bg3);color:var(--text)}.bg:hover{background:var(--bg4)}
+  .bd{background:rgba(251,113,133,0.1);color:var(--rose);border:1px solid rgba(251,113,133,0.2)}.bd:hover{background:rgba(251,113,133,0.2)}
+  .bf{background:var(--bg4);color:var(--muted);cursor:not-allowed;border:none}
+  .bsm{padding:4px 11px;font-size:11px} .blg{padding:11px 24px;font-size:14px;border-radius:11px}
+
+  .pages{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:28px}
+  .pg{width:32px;height:32px;border-radius:7px;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.16s}
+  .pg:hover:not(:disabled){border-color:rgba(245,158,11,0.38);color:var(--amber)}
+  .pg.on{background:linear-gradient(135deg,var(--amber),var(--coral));border-color:transparent;color:#fff}
+  .pg:disabled{opacity:.32;cursor:not-allowed}
+
+  .dcard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:28px;backdrop-filter:blur(10px)}
+  .dtitle{font-family:'Syne',sans-serif;font-size:clamp(20px,3.8vw,32px);font-weight:800;line-height:1.2;margin-bottom:16px}
+  .dgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:20px}
+  .di{background:var(--bg3);border-radius:var(--rs);padding:11px 13px}
+  .di-l{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:3px}
+  .di-v{font-size:13px;font-weight:500;line-height:1.4}
+  .ddesc{color:var(--muted);line-height:1.75;font-size:13px}
+
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.72);backdrop-filter:blur(8px);z-index:200;display:flex;align-items:center;justify-content:center;padding:18px;animation:fadeIn 0.16s ease}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .modal{background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:30px 26px;width:100%;max-width:390px;animation:slideUp 0.22s ease}
+  @keyframes slideUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+  .mhead{text-align:center;margin-bottom:20px}
+  .mhead h2{font-family:'Syne',sans-serif;font-size:21px;font-weight:800;margin-bottom:3px}
+  .mhead p{color:var(--muted);font-size:12px}
+  .fg{margin-bottom:13px} .fl{font-size:11px;font-weight:500;color:var(--muted);margin-bottom:4px;display:block}
+  .fi{width:100%;background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--rs);padding:9px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border-color 0.16s}
+  .fi:focus{border-color:rgba(245,158,11,0.45)} .fi::placeholder{color:var(--muted)} select.fi option{background:var(--bg2)}
+  .ferr{color:var(--rose);font-size:11px;margin-top:9px;text-align:center}
+  .fsw{text-align:center;margin-top:13px;font-size:12px;color:var(--muted)}
+  .fsw button{background:none;border:none;color:var(--amber);font-weight:600;cursor:pointer}
+
+  .ccard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:28px;max-width:640px;margin:0 auto;backdrop-filter:blur(10px)}
+  .f2{display:grid;grid-template-columns:1fr 1fr;gap:12px} .s2{grid-column:span 2}
+
+  .tabs{display:flex;gap:3px;background:var(--bg3);border-radius:var(--rs);padding:3px;width:fit-content;margin-bottom:20px}
+  .tab{background:none;border:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;padding:5px 14px;border-radius:7px;cursor:pointer;transition:all 0.16s}
+  .tab.on{background:var(--bg4);color:var(--text)}
+
+  .empty{text-align:center;padding:52px 18px;color:var(--muted)}
+  .eico{font-size:40px;margin-bottom:9px}
+  .empty h3{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;color:var(--text);margin-bottom:5px}
+  .empty p{font-size:12px;line-height:1.6}
+
+  .toast{position:fixed;bottom:20px;right:20px;z-index:300;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);padding:11px 15px;display:flex;align-items:center;gap:8px;box-shadow:0 7px 24px rgba(0,0,0,0.38);animation:tin 0.22s ease;font-size:12px;max-width:300px}
+  @keyframes tin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .toast.ok{border-color:rgba(52,211,153,0.26)} .toast.err{border-color:rgba(251,113,133,0.26)}
+
+  .back{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:12px;cursor:pointer;margin-bottom:18px;background:none;border:none;font-family:'DM Sans',sans-serif;transition:color 0.16s}
+  .back:hover{color:var(--text)}
+  .hr{height:1px;background:var(--border);margin:18px 0}
+  .stitle{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:11px}
+  .spinner{width:32px;height:32px;border:3px solid var(--bg4);border-top-color:var(--amber);border-radius:50%;animation:spin 0.7s linear infinite;margin:48px auto;display:block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  @media(max-width:768px){.nav-links{display:none}.ham{display:flex}.grid{grid-template-columns:1fr}.dgrid{grid-template-columns:1fr}.f2{grid-template-columns:1fr}.s2{grid-column:span 1}.stats{gap:8px}.scard{padding:13px 16px}.ccard,.dcard{padding:18px 14px}}
+  @media(max-width:480px){.hero h1{font-size:27px}.toast{left:12px;right:12px;bottom:12px}}
+`;
+
+// ─── Small Components ─────────────────────────────────────────────────────────
+function Toast({ msg, type, onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
+  return <div className={`toast ${type === "error" ? "err" : "ok"}`}><span>{type === "error" ? "❌" : "✅"}</span><span>{msg}</span></div>;
+}
+function Spinner() { return <div className="spinner" />; }
+function CBar({ count, max }) {
+  const p = capPct(count, max);
+  const cls = p >= 100 ? "c-r" : p >= 80 ? "c-o" : p >= 50 ? "c-a" : "c-g";
+  return <div className="cbar"><div className={`cfill ${cls}`} style={{ width:`${p}%` }} /></div>;
+}
+function CTag({ cat }) { return <span className={`ctag ${cat}`}>{CAT_ICON[cat] || ""} {cat}</span>; }
+
+function JoinBtn({ event, user, onAction }) {
+  const [joined,  setJoined]  = useState(false);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!user) { setJoined(false); return; }
+    db.isJoined(event.id, user.id).then(setJoined);
+  }, [event.id, user]);
+  const full  = event.attendee_count >= event.max_participants;
+  const click = async e => {
+    e.stopPropagation();
+    if (!user) { onAction("auth"); return; }
+    setLoading(true);
+    const r = joined ? await db.leaveEvent(event.id, user.id) : await db.joinEvent(event.id, user.id);
+    setLoading(false);
+    if (r.error) { onAction("error:" + r.error); return; }
+    setJoined(!joined);
+    onAction(joined ? "left" : "joined");
+  };
+  if (loading)         return <button className="btn bf bsm" disabled>…</button>;
+  if (full && !joined) return <button className="btn bf bsm" disabled>Full</button>;
+  if (joined)          return <button className="btn bd bsm" onClick={click}>Leave</button>;
+  return                      <button className="btn bp bsm" onClick={click}>Join ✦</button>;
+}
+
+function ECard({ event, user, onSelect, onAction }) {
+  const isNew = Date.now() - new Date(event.created_at).getTime() < 172800000;
+  return (
+    <div className="ecard" onClick={() => onSelect(event)} role="button" tabIndex={0} onKeyDown={e => e.key === "Enter" && onSelect(event)}>
+      <div className="ecard-head"><CTag cat={event.category} />{isNew && <span className="badge-new">NEW</span>}</div>
+      <div className="ecard-body">
+        <div className="etitle">{trunc(event.title, 100)}</div>
+        <div className="emeta">
+          <div className="emr">📅 {fmtDate(event.date)} · {fmtTime(event.date)}</div>
+          <div className="emr">📍 {trunc(event.location, 70)}</div>
+          <div className="emr">👤 {trunc(event.host_name, 50)}</div>
+        </div>
+        <CBar count={event.attendee_count} max={event.max_participants} />
+        <div className="efoot">
+          <span className="ecnt">{event.attendee_count}/{event.max_participants} joined</span>
+          <JoinBtn event={event} user={user} onAction={onAction} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Auth Modal ───────────────────────────────────────────────────────────────
+function AuthModal({ onClose, onAuth }) {
+  const [mode, setMode]       = useState("login");
+  const [form, setForm]       = useState({ name:"", email:"", password:"" });
+  const [error, setError]     = useState("");
+  const [loading, setLoading] = useState(false);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const go  = async () => {
+    setError(""); setLoading(true);
+    const r = mode === "login" ? await db.signIn(form.email, form.password) : await db.signUp(form.name, form.email, form.password);
+    setLoading(false);
+    if (r.error) setError(r.error);
+    else { onAuth(r.data); onClose(); }
+  };
+  return (
+    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="mhead">
+          <div style={{ display:"flex", alignItems:"center", gap:8, justifyContent:"center", marginBottom:12 }}>
+            <div className="logo-mark">U</div><span className="logo-text">Uni<span>Vibe</span></span>
+          </div>
+          <h2>{mode === "login" ? "Welcome back" : "Join UniVibe"}</h2>
+          <p>{mode === "login" ? "Sign in to join and create events" : "Start discovering campus life"}</p>
+        </div>
+        {mode === "signup" && <div className="fg"><label className="fl">Full Name</label><input className="fi" placeholder="Your name" value={form.name} onChange={e => set("name", e.target.value)} maxLength={100} /></div>}
+        <div className="fg"><label className="fl">Email</label><input className="fi" type="email" placeholder="you@university.edu" value={form.email} onChange={e => set("email", e.target.value)} maxLength={200} /></div>
+        <div className="fg"><label className="fl">Password</label><input className="fi" type="password" placeholder="••••••••" value={form.password} onChange={e => set("password", e.target.value)} onKeyDown={e => e.key === "Enter" && !loading && go()} maxLength={200} /></div>
+        {error && <div className="ferr">{error}</div>}
+        <button className="btn bp" style={{ width:"100%", justifyContent:"center", marginTop:16 }} onClick={go} disabled={loading}>{loading ? "Please wait…" : mode === "login" ? "Sign In" : "Create Account"}</button>
+        <div className="fsw">{mode === "login" ? <>No account? <button onClick={() => { setMode("signup"); setError(""); }}>Sign up free</button></> : <>Have an account? <button onClick={() => { setMode("login"); setError(""); }}>Sign in</button></>}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Home Page ────────────────────────────────────────────────────────────────
+function HomePage({ user, onSelect, onRefresh, onShowAuth }) {
+  const [cat, setCat]         = useState("All");
+  const [search, setSearch]   = useState("");
+  const [page, setPage]       = useState(0);
+  const [events, setEvents]   = useState([]);
+  const [total, setTotal]     = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats]     = useState({ totalEvents:0, totalJoins:0, topCategory:"—" });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [evRes, stRes] = await Promise.all([db.getEvents(cat, page, search), db.getStats()]);
+    setEvents(evRes.data); setTotal(evRes.total); setStats(stRes);
+    setLoading(false);
+  }, [cat, page, search]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setPage(0); }, [cat, search]);
+
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const act = useCallback(async a => {
+    if (a === "auth")           { onShowAuth(); return; }
+    if (a.startsWith("error:")) { onRefresh("error", a.slice(6)); return; }
+    await load(); onRefresh("ok", a === "joined" ? "Joined! 🎉" : "Left event.");
+  }, [load, onRefresh, onShowAuth]);
+
+  return (
+    <div className="page"><div className="container">
+      <div className="hero">
+        <div className="hero-badge">🎓 Your campus. Your events.</div>
+        <h1>Find what's <em>happening</em><br />on campus</h1>
+        <p>Discover events, connect with people, and make the most of university life.</p>
+        <div className="hero-btns">
+          <button className="btn bp blg" onClick={() => user ? onSelect("create") : onShowAuth()}>✦ Host an Event</button>
+          <button className="btn bo blg" onClick={() => document.getElementById("feed")?.scrollIntoView({ behavior:"smooth" })}>Browse Events ↓</button>
+        </div>
+      </div>
+      <div className="stats">
+        <div className="scard"><div className="snum">{stats.totalEvents}</div><div className="slbl">Events Created</div></div>
+        <div className="scard"><div className="snum">{stats.totalJoins}</div><div className="slbl">RSVPs</div></div>
+        <div className="scard"><div className="snum">{VALID_CATS.length}</div><div className="slbl">Categories</div></div>
+        <div className="scard"><div className="snum">{CAT_ICON[stats.topCategory] || "—"} {stats.topCategory}</div><div className="slbl">Top Category</div></div>
+      </div>
+      <div id="feed">
+        <div className="stitle">Upcoming Events</div>
+        <div className="sbar">
+          <span style={{ color:"var(--muted)", fontSize:13 }}>🔍</span>
+          <input placeholder="Search events, locations…" value={search} onChange={e => setSearch(e.target.value)} maxLength={200} />
+          {search && <button className="sbar-x" onClick={() => setSearch("")}>×</button>}
+        </div>
+        <div className="filters">{ALL_CATS.map(c => <button key={c} className={`pill ${cat===c?"on":""}`} onClick={() => setCat(c)}>{c !== "All" ? CAT_ICON[c]+" " : ""}{c}</button>)}</div>
+        {loading ? <Spinner />
+          : events.length === 0
+          ? <div className="empty"><div className="eico">🔭</div><h3>No events yet</h3><p>{search || cat !== "All" ? "Try a different filter." : "Be the first to create an event!"}</p></div>
+          : <div className="grid">{events.map(e => <ECard key={e.id} event={e} user={user} onSelect={onSelect} onAction={act} />)}</div>
+        }
+        {!loading && pages > 1 && (
+          <div className="pages">
+            <button className="pg" onClick={() => setPage(p => p-1)} disabled={page===0}>‹</button>
+            {[...Array(pages)].map((_,i) => <button key={i} className={`pg ${i===page?"on":""}`} onClick={() => setPage(i)}>{i+1}</button>)}
+            <button className="pg" onClick={() => setPage(p => p+1)} disabled={page>=pages-1}>›</button>
+          </div>
+        )}
+      </div>
+    </div></div>
+  );
+}
+
+// ─── Detail Page ──────────────────────────────────────────────────────────────
+function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
+  const [event,   setEvent]   = useState(null);
+  const [joined,  setJoined]  = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [acting,  setActing]  = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const [ev, j] = await Promise.all([db.getEvent(eventId), user ? db.isJoined(eventId, user.id) : Promise.resolve(false)]);
+      setEvent(ev); setJoined(j); setLoading(false);
+    })();
+  }, [eventId, user]);
+
+  if (loading) return <div className="page"><Spinner /></div>;
+  if (!event)  return <div className="page"><div className="container"><div className="empty"><div className="eico">❓</div><h3>Event not found</h3><button className="btn bg" style={{ marginTop:14 }} onClick={onBack}>← Go Back</button></div></div></div>;
+
+  const full = event.attendee_count >= event.max_participants;
+  const pct  = capPct(event.attendee_count, event.max_participants);
+
+  const toggle = async () => {
+    if (!user) { onShowAuth(); return; }
+    setActing(true);
+    const r = joined ? await db.leaveEvent(event.id, user.id) : await db.joinEvent(event.id, user.id);
+    setActing(false);
+    if (r.error) { onRefresh("error", r.error); return; }
+    const nj = !joined; setJoined(nj);
+    setEvent(ev => ({ ...ev, attendee_count: ev.attendee_count + (nj ? 1 : -1) }));
+    onRefresh("ok", nj ? "Joined! 🎉" : "Left event.");
+  };
+
+  return (
+    <div className="page"><div className="container" style={{ maxWidth:700 }}>
+      <button className="back" onClick={onBack}>← Back to Events</button>
+      <div className="dcard">
+        <div style={{ marginBottom:11 }}><CTag cat={event.category} /></div>
+        <div className="dtitle">{event.title}</div>
+        <div className="dgrid">
+          <div className="di"><div className="di-l">Date</div><div className="di-v">📅 {fmtDate(event.date)}</div></div>
+          <div className="di"><div className="di-l">Time</div><div className="di-v">🕐 {fmtTime(event.date)}</div></div>
+          <div className="di"><div className="di-l">Location</div><div className="di-v">📍 {event.location}</div></div>
+          <div className="di"><div className="di-l">Host</div><div className="di-v">👤 {event.host_name}</div></div>
+        </div>
+        <div className="ddesc">{event.description}</div>
+        <div className="hr" />
+        <div className="stitle">Attendance</div>
+        <div style={{ marginBottom:9 }}>
+          <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:20 }}>{event.attendee_count}</span>
+          <span style={{ color:"var(--muted)", fontSize:13 }}> / {event.max_participants} · {pct}% full</span>
+        </div>
+        <CBar count={event.attendee_count} max={event.max_participants} />
+        <div style={{ marginTop:20, display:"flex", gap:9, flexWrap:"wrap" }}>
+          {full && !joined
+            ? <button className="btn bf blg" disabled>Event Full</button>
+            : <button className={`btn blg ${joined?"bd":"bp"}`} onClick={toggle} disabled={acting}>{acting ? "…" : joined ? "Leave Event" : "Join Event ✦"}</button>
+          }
+          <button className="btn bg blg" onClick={onBack}>← Back</button>
+        </div>
+      </div>
+    </div></div>
+  );
+}
+
+// ─── Create Page ──────────────────────────────────────────────────────────────
+function CreatePage({ user, onBack, onShowAuth, onCreated }) {
+  const [form, setForm]       = useState({ title:"", description:"", category:"Social", date:"", location:"", max_participants:50 });
+  const [error, setError]     = useState("");
+  const [loading, setLoading] = useState(false);
+
+  if (!user) return <div className="page"><div className="container"><div className="empty"><div className="eico">🔐</div><h3>Sign in to create events</h3><button className="btn bp" style={{ marginTop:14 }} onClick={onShowAuth}>Sign In</button></div></div></div>;
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const go  = async () => {
+    setError("");
+    if (!form.title.trim())       { setError("Title is required."); return; }
+    if (!form.description.trim()) { setError("Description is required."); return; }
+    if (!form.location.trim())    { setError("Location is required."); return; }
+    if (!form.date)               { setError("Date & time are required."); return; }
+    const maxP = parseInt(form.max_participants);
+    if (isNaN(maxP) || maxP < 1) { setError("Max participants must be at least 1."); return; }
+    setLoading(true);
+    const r = await db.createEvent({ ...form, max_participants: maxP }, user.id);
+    setLoading(false);
+    if (r.error) setError(r.error); else onCreated();
+  };
+
+  return (
+    <div className="page"><div className="container">
+      <button className="back" onClick={onBack}>← Back</button>
+      <div style={{ marginBottom:20 }}>
+        <div style={{ fontFamily:"'Syne',sans-serif", fontSize:22, fontWeight:800 }}>✦ Host an Event</div>
+        <p style={{ color:"var(--muted)", fontSize:12, marginTop:3 }}>Fill in the details to publish your campus event.</p>
+      </div>
+      <div className="ccard">
+        <div className="f2">
+          <div className="s2 fg"><label className="fl">Event Title *</label><input className="fi" placeholder="Give your event a catchy title" value={form.title} onChange={e => set("title", e.target.value)} maxLength={200} /></div>
+          <div className="fg"><label className="fl">Category *</label><select className="fi" value={form.category} onChange={e => set("category", e.target.value)}>{VALID_CATS.map(c => <option key={c}>{c}</option>)}</select></div>
+          <div className="fg"><label className="fl">Max Participants *</label><input className="fi" type="number" min={1} max={10000} value={form.max_participants} onChange={e => set("max_participants", e.target.value)} /></div>
+          <div className="fg"><label className="fl">Date & Time * <span style={{ color:"var(--muted)", fontWeight:400, fontSize:10 }}>(today → Dec 2030)</span></label><input className="fi" type="datetime-local" min={todayMin()} max={DATE_MAX} value={form.date} onChange={e => set("date", e.target.value)} /></div>
+          <div className="fg"><label className="fl">Location *</label><input className="fi" placeholder="e.g. Main Hall, Room 101" value={form.location} onChange={e => set("location", e.target.value)} maxLength={300} /></div>
+          <div className="s2 fg"><label className="fl">Description *</label><textarea className="fi" rows={5} placeholder="Describe what attendees can expect…" value={form.description} onChange={e => set("description", e.target.value)} maxLength={2000} style={{ resize:"vertical" }} /></div>
+        </div>
+        {error && <div className="ferr">{error}</div>}
+        <div style={{ display:"flex", gap:9, marginTop:20 }}>
+          <button className="btn bp blg" onClick={go} disabled={loading}>{loading ? "Publishing…" : "✦ Publish Event"}</button>
+          <button className="btn bg blg" onClick={onBack}>Cancel</button>
+        </div>
+      </div>
+    </div></div>
+  );
+}
+
+// ─── My Events Page ───────────────────────────────────────────────────────────
+function MyPage({ user, onSelect, onRefresh, onShowAuth }) {
+  const [tab,     setTab]     = useState("joined");
+  const [data,    setData]    = useState({ joined:[], created:[] });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) { setLoading(false); return; }
+    setLoading(true);
+    db.getMyEvents(user.id).then(d => { setData(d); setLoading(false); });
+  }, [user]);
+
+  if (!user) return <div className="page"><div className="container"><div className="empty"><div className="eico">🎟️</div><h3>Sign in to see your events</h3><button className="btn bp" style={{ marginTop:14 }} onClick={onShowAuth}>Sign In</button></div></div></div>;
+
+  const list = tab === "joined" ? data.joined : data.created;
+  const act  = async a => {
+    if (a === "auth")           { onShowAuth(); return; }
+    if (a.startsWith("error:")) { onRefresh("error", a.slice(6)); return; }
+    const d = await db.getMyEvents(user.id); setData(d);
+    onRefresh("ok", a === "joined" ? "Joined! 🎉" : "Left event.");
+  };
+
+  return (
+    <div className="page"><div className="container">
+      <div style={{ fontFamily:"'Syne',sans-serif", fontSize:22, fontWeight:800, marginBottom:5 }}>My Events</div>
+      <p style={{ color:"var(--muted)", fontSize:12, marginBottom:18 }}>Hello, {user.name} 👋</p>
+      <div className="tabs">
+        <button className={`tab ${tab==="joined"?"on":""}`} onClick={() => setTab("joined")}>🎟️ Joined ({data.joined.length})</button>
+        <button className={`tab ${tab==="created"?"on":""}`} onClick={() => setTab("created")}>✦ Created ({data.created.length})</button>
+      </div>
+      {loading ? <Spinner />
+        : list.length === 0
+        ? <div className="empty"><div className="eico">{tab==="joined"?"🔍":"✨"}</div><h3>{tab==="joined"?"No events joined yet":"No events created yet"}</h3><p>{tab==="joined"?"Browse events on the home page.":"Host your first campus event!"}</p></div>
+        : <div className="grid">{list.map(e => <ECard key={e.id} event={e} user={user} onSelect={onSelect} onAction={act} />)}</div>
+      }
+    </div></div>
+  );
+}
+
+// ─── Root App ─────────────────────────────────────────────────────────────────
+export default function App() {
+  const [page, setPage]             = useState("home");
+  const [selId, setSelId]           = useState(null);
+  const [user, setUser]             = useState(db.getSession());
+  const [showAuth, setShowAuth]     = useState(false);
+  const [toast, setToast]           = useState(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [tick, setTick]             = useState(0);
+
+  const showToast = useCallback((type, msg) => setToast({ type, msg, k: Date.now() }), []);
+  const nav       = p => { setPage(p); setSelId(null); setMobileOpen(false); };
+  const sel       = ev => { if (typeof ev === "string") { nav(ev); return; } setSelId(ev.id); setPage("detail"); };
+  const refresh   = useCallback((type, msg) => { showToast(type, msg); setTick(t => t+1); }, [showToast]);
+
+  return (
+    <ErrorBoundary>
+      <div className="app">
+        <style>{css}</style>
+        <nav className="nav">
+          <div className="nav-inner">
+            <div className="logo" onClick={() => nav("home")}><div className="logo-mark">U</div><span className="logo-text">Uni<span>Vibe</span></span></div>
+            <div className="nav-links">
+              <button className={`nb ${page==="home"?"on":""}`} onClick={() => nav("home")}>Events</button>
+              <button className={`nb ${page==="my"?"on":""}`}   onClick={() => nav("my")}>My Events</button>
+              <button className={`nb ${page==="create"?"on":""}`} onClick={() => nav("create")}>Host Event</button>
+              {user ? (
+                <><div className="avatar" title={user.name} onClick={() => nav("my")}>{user.name[0].toUpperCase()}</div>
+                  <button className="nb out" onClick={() => { db.signOut(); setUser(null); nav("home"); showToast("ok","Signed out."); }}>Sign Out</button></>
+              ) : (
+                <button className="nb cta" onClick={() => setShowAuth(true)}>Sign In</button>
+              )}
+            </div>
+            <div className="ham" onClick={() => setMobileOpen(o => !o)}><span /><span /><span /></div>
+          </div>
+          <div className={`mmenu ${mobileOpen?"open":""}`}>
+            <button className="nb" onClick={() => nav("home")}>Events</button>
+            <button className="nb" onClick={() => nav("my")}>My Events</button>
+            <button className="nb" onClick={() => nav("create")}>Host Event</button>
+            {user
+              ? <button className="nb" onClick={() => { db.signOut(); setUser(null); nav("home"); showToast("ok","Signed out."); }}>Sign Out ({user.name})</button>
+              : <button className="nb" onClick={() => { setShowAuth(true); setMobileOpen(false); }}>Sign In</button>
+            }
+          </div>
+        </nav>
+        <ErrorBoundary>
+          {page==="home"   && <HomePage  key={tick} user={user} onSelect={sel} onRefresh={refresh} onShowAuth={() => setShowAuth(true)} />}
+          {page==="detail" && selId && <DetailPage eventId={selId} user={user} onBack={() => nav("home")} onShowAuth={() => setShowAuth(true)} onRefresh={refresh} />}
+          {page==="create" && <CreatePage user={user} onBack={() => nav("home")} onShowAuth={() => setShowAuth(true)} onCreated={() => { showToast("ok","Event published! 🎉"); nav("home"); setTick(t => t+1); }} />}
+          {page==="my"     && <MyPage key={tick} user={user} onSelect={sel} onRefresh={refresh} onShowAuth={() => setShowAuth(true)} />}
+        </ErrorBoundary>
+        {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuth={u => { setUser(u); showToast("ok", `Welcome, ${u.name}! 🎓`); }} />}
+        {toast && <Toast key={toast.k} msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      </div>
+    </ErrorBoundary>
+  );
+}
