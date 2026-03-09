@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, Component } from "react";
 
 // ─── Supabase REST Client (no external library needed) ────────────────────────
 const SB_URL = "https://hdnbrarxisehdmqtswqq.supabase.co";
-const SB_KEY = "sb_publishable_33k36-AzfxfkTyK5V4IQIg_7QAfbQbY";
+const SB_KEY= "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkbmJyYXJ4aXNlaGRtcXRzd3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5OTc5NzQsImV4cCI6MjA4ODU3Mzk3NH0.p7wkBnmPibh8PFDgyfnh49KyYSzY6UVfUFHDwW0pb6c";
 
 // All Supabase calls go through this one fetch wrapper
 async function sb(path, options = {}) {
