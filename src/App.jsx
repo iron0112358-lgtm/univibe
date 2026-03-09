@@ -148,15 +148,10 @@ const db = {
 
   async getEvents(category, page = 0, search = "") {
     return wrap(async () => {
-      const from  = page * PAGE_SIZE;
-      const to    = from + PAGE_SIZE - 1;
+      const from = page * PAGE_SIZE;
 
-      // Build query params
-      const params = { select: "id,title,description,date,location,category,host_id,max_participants,created_at,users(name)", order: "created_at.desc" };
-      let path = "events";
-
-      // Use fetch directly for more complex filtering
-      let url = `${SB_URL}/rest/v1/events?select=id,title,description,date,location,category,host_id,max_participants,created_at,users(name)&order=created_at.desc`;
+      // Fetch events without join
+      let url = `${SB_URL}/rest/v1/events?select=id,title,description,date,location,category,host_id,max_participants,created_at&order=created_at.desc`;
       if (category && category !== "All") url += `&category=eq.${encodeURIComponent(category)}`;
       if (search?.trim()) url += `&title=ilike.${encodeURIComponent("*" + search.trim() + "*")}`;
       url += `&offset=${from}&limit=${PAGE_SIZE}`;
@@ -164,14 +159,26 @@ const db = {
       const res = await fetch(url, {
         headers: {
           "apikey": SB_KEY,
-          "Authorization": `Bearer ${_session?.token || SB_KEY}`,
+          "Authorization": `Bearer ${SB_KEY}`,
           "Prefer": "count=exact",
         },
       });
       const total = parseInt(res.headers.get("content-range")?.split("/")[1] || "0");
       const data  = await res.json();
 
-      if (!res.ok) return { data: [], total: 0 };
+      if (!res.ok || !Array.isArray(data)) return { data: [], total: 0 };
+
+      // Fetch host names separately
+      const hostIds = [...new Set((data || []).map(e => e.host_id).filter(Boolean))];
+      let nameMap = {};
+      if (hostIds.length > 0) {
+        const nRes = await fetch(
+          `${SB_URL}/rest/v1/users?id=in.(${hostIds.join(",")})&select=id,name`,
+          { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+        );
+        const names = await nRes.json();
+        (names || []).forEach(u => { nameMap[u.id] = u.name; });
+      }
 
       // Get attendee counts for this batch
       const ids = (data || []).map(e => `"${e.id}"`).join(",");
@@ -187,7 +194,7 @@ const db = {
 
       const events = (data || []).map(e => ({
         ...e,
-        host_name: e.users?.name || "Unknown",
+        host_name: nameMap[e.host_id] || "Unknown",
         attendee_count: countMap[e.id] || 0,
       }));
       return { data: events, total };
@@ -196,11 +203,17 @@ const db = {
 
   async getEvent(id) {
     return wrap(async () => {
-      const { data, error } = await sb(`events?id=eq.${id}&select=id,title,description,date,location,category,host_id,max_participants,created_at,users(name)`, {
-        token: _session?.token,
+      const evRes = await fetch(`${SB_URL}/rest/v1/events?id=eq.${id}&select=id,title,description,date,location,category,host_id,max_participants,created_at`, {
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
       });
-      if (error || !data?.[0]) return null;
-      const event = data[0];
+      const evData = await evRes.json();
+      if (!evRes.ok || !evData?.[0]) return null;
+      const event = evData[0];
+      const nRes = await fetch(`${SB_URL}/rest/v1/users?id=eq.${event.host_id}&select=name`, {
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
+      });
+      const nData = await nRes.json();
+      event.host_name = nData?.[0]?.name || "Unknown";
 
       // Get attendee count
       const countRes = await fetch(
@@ -299,29 +312,38 @@ const db = {
 
   async getMyEvents(userId) {
     return wrap(async () => {
-      const token = _session?.token || SB_KEY;
-
       // Get joined event IDs
       const attRes = await fetch(
         `${SB_URL}/rest/v1/event_attendees?user_id=eq.${userId}&select=event_id`,
-        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${token}` } }
+        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
       );
       const att = await attRes.json();
       const joinedIds = (att || []).map(a => a.event_id);
 
-      const [joinedRes, createdRes] = await Promise.all([
+      const [joinedRaw, createdRaw] = await Promise.all([
         joinedIds.length
-          ? fetch(`${SB_URL}/rest/v1/events?id=in.(${joinedIds.map(i => `"${i}"`).join(",")})&select=id,title,description,date,location,category,host_id,max_participants,created_at,users(name)&order=created_at.desc`,
-              { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${token}` } }).then(r => r.json())
+          ? fetch(`${SB_URL}/rest/v1/events?id=in.(${joinedIds.join(",")})&select=id,title,description,date,location,category,host_id,max_participants,created_at&order=created_at.desc`,
+              { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }).then(r => r.json())
           : Promise.resolve([]),
-        fetch(`${SB_URL}/rest/v1/events?host_id=eq.${userId}&select=id,title,description,date,location,category,host_id,max_participants,created_at,users(name)&order=created_at.desc`,
-          { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${token}` } }).then(r => r.json()),
+        fetch(`${SB_URL}/rest/v1/events?host_id=eq.${userId}&select=id,title,description,date,location,category,host_id,max_participants,created_at&order=created_at.desc`,
+          { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }).then(r => r.json()),
       ]);
 
+      // Fetch host names
+      const allEvents = [...(Array.isArray(joinedRaw) ? joinedRaw : []), ...(Array.isArray(createdRaw) ? createdRaw : [])];
+      const hostIds = [...new Set(allEvents.map(e => e.host_id).filter(Boolean))];
+      let nameMap = {};
+      if (hostIds.length) {
+        const nRes = await fetch(`${SB_URL}/rest/v1/users?id=in.(${hostIds.join(",")})&select=id,name`,
+          { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } });
+        const names = await nRes.json();
+        (names || []).forEach(u => { nameMap[u.id] = u.name; });
+      }
+
       const fmt = arr => (Array.isArray(arr) ? arr : []).map(e => ({
-        ...e, host_name: e.users?.name || "Unknown", attendee_count: 0,
+        ...e, host_name: nameMap[e.host_id] || "Unknown", attendee_count: 0,
       }));
-      return { joined: fmt(joinedRes), created: fmt(createdRes) };
+      return { joined: fmt(joinedRaw), created: fmt(createdRaw) };
     }, { joined: [], created: [] });
   },
 
