@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, Component } from "react";
 
 // ─── Supabase REST Client (no external library needed) ────────────────────────
 const SB_URL = "https://hdnbrarxisehdmqtswqq.supabase.co";
-const SB_KEY= "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkbmJyYXJ4aXNlaGRtcXRzd3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5OTc5NzQsImV4cCI6MjA4ODU3Mzk3NH0.p7wkBnmPibh8PFDgyfnh49KyYSzY6UVfUFHDwW0pb6c";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkbmJyYXJ4aXNlaGRtcXRzd3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5OTc5NzQsImV4cCI6MjA4ODU3Mzk3NH0.p7wkBnmPibh8PFDgyfnh49KyYSzY6UVfUFHDwW0pb6c";
 
 // All Supabase calls go through this one fetch wrapper
 async function sb(path, options = {}) {
@@ -81,20 +81,25 @@ const db = {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email." };
       if (String(password || "").length < 6) return { error: "Password must be 6+ characters." };
 
-      // Create auth user
       const { data: auth, error: authErr } = await sbAuth("signup", { email, password });
       if (authErr) return { error: authErr };
 
       const token = auth.access_token;
-      _session = { id: auth.user.id, email, name, token };
+      const userId = auth.user.id;
 
-      // Save profile in users table
-      await sb("users", {
+      // Save profile using anon key (RLS disabled)
+      await fetch(`${SB_URL}/rest/v1/users`, {
         method: "POST",
-        token,
-        body: { id: auth.user.id, name, email },
+        headers: {
+          "apikey": SB_KEY,
+          "Authorization": `Bearer ${SB_KEY}`,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal",
+        },
+        body: JSON.stringify({ id: userId, name, email }),
       });
 
+      _session = { id: userId, email, name, token };
       return { data: _session };
     }, { error: "Sign up failed. Please try again." });
   },
@@ -109,12 +114,31 @@ const db = {
       if (error) return { error };
 
       const token = auth.access_token;
+      const userId = auth.user.id;
 
-      // Fetch profile name
-      const { data: profile } = await sb(`users?id=eq.${auth.user.id}&select=name`, { token });
-      const name = profile?.[0]?.name || "User";
+      // Fetch profile
+      const profileRes = await fetch(`${SB_URL}/rest/v1/users?id=eq.${userId}&select=name`, {
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
+      });
+      const profile = await profileRes.json();
+      let name = profile?.[0]?.name;
 
-      _session = { id: auth.user.id, email, name, token };
+      // Auto-create profile if missing
+      if (!name) {
+        name = email.split("@")[0];
+        await fetch(`${SB_URL}/rest/v1/users`, {
+          method: "POST",
+          headers: {
+            "apikey": SB_KEY,
+            "Authorization": `Bearer ${SB_KEY}`,
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+          },
+          body: JSON.stringify({ id: userId, name, email }),
+        });
+      }
+
+      _session = { id: userId, email, name, token };
       return { data: _session };
     }, { error: "Sign in failed. Please try again." });
   },
