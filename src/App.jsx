@@ -50,6 +50,7 @@ async function sbAuth(path, body) {
 let _session = null;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+const ADMIN_EMAIL = "chichinadze.sab@gmail.com";
 const VALID_CATS = ["Tech", "Sports", "Social", "Education", "Entrepreneurship"];
 const ALL_CATS   = ["All", ...VALID_CATS];
 const CAT_ICON   = { Tech:"⚡", Sports:"🏃", Social:"🎉", Education:"📚", Entrepreneurship:"🚀" };
@@ -222,7 +223,7 @@ const db = {
       );
       const count = parseInt(countRes.headers.get("content-range")?.split("/")[1] || "0");
 
-      return { ...event, host_name: event.users?.name || "Unknown", attendee_count: count };
+      return { ...event, attendee_count: count };
     }, null);
   },
 
@@ -291,6 +292,22 @@ const db = {
       if (!res.ok) return { error: "Could not leave event." };
       return { data: true };
     }, { error: "Could not leave event." });
+  },
+
+  async deleteEvent(eventId) {
+    return wrap(async () => {
+      if (!_session?.token) return { error: "Sign in required." };
+      const res = await fetch(`${SB_URL}/rest/v1/events?id=eq.${eventId}`, {
+        method: "DELETE",
+        headers: {
+          "apikey": SB_KEY,
+          "Authorization": `Bearer ${SB_KEY}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!res.ok) return { error: "Could not delete event." };
+      return { data: true };
+    }, { error: "Could not delete event." });
   },
 
   async isJoined(eventId, userId) {
@@ -577,10 +594,28 @@ function JoinBtn({ event, user, onAction }) {
 }
 
 function ECard({ event, user, onSelect, onAction }) {
-  const isNew = Date.now() - new Date(event.created_at).getTime() < 172800000;
+  const isNew    = Date.now() - new Date(event.created_at).getTime() < 172800000;
+  const isHost   = user && event.host_id === user.id;
+  const isAdmin  = user && user.email === ADMIN_EMAIL;
+  const canDelete = isHost || isAdmin;
+
+  const handleDelete = async e => {
+    e.stopPropagation();
+    if (!window.confirm("Delete this event?")) return;
+    const r = await db.deleteEvent(event.id);
+    if (r.error) { onAction("error:" + r.error); return; }
+    onAction("deleted");
+  };
+
   return (
     <div className="ecard" onClick={() => onSelect(event)} role="button" tabIndex={0} onKeyDown={e => e.key === "Enter" && onSelect(event)}>
-      <div className="ecard-head"><CTag cat={event.category} />{isNew && <span className="badge-new">NEW</span>}</div>
+      <div className="ecard-head">
+        <CTag cat={event.category} />
+        <div style={{ display:"flex", gap:5, alignItems:"center" }}>
+          {isNew && <span className="badge-new">NEW</span>}
+          {canDelete && <button className="btn bd bsm" onClick={handleDelete} style={{ fontSize:10, padding:"2px 8px" }}>🗑</button>}
+        </div>
+      </div>
       <div className="ecard-body">
         <div className="etitle">{trunc(event.title, 100)}</div>
         <div className="emeta">
@@ -704,10 +739,11 @@ function HomePage({ user, onSelect, onRefresh, onShowAuth }) {
 
 // ─── Detail Page ──────────────────────────────────────────────────────────────
 function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
-  const [event,   setEvent]   = useState(null);
-  const [joined,  setJoined]  = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [acting,  setActing]  = useState(false);
+  const [event,    setEvent]   = useState(null);
+  const [joined,   setJoined]  = useState(false);
+  const [loading,  setLoading] = useState(true);
+  const [acting,   setActing]  = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -720,8 +756,11 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
   if (loading) return <div className="page"><Spinner /></div>;
   if (!event)  return <div className="page"><div className="container"><div className="empty"><div className="eico">❓</div><h3>Event not found</h3><button className="btn bg" style={{ marginTop:14 }} onClick={onBack}>← Go Back</button></div></div></div>;
 
-  const full = event.attendee_count >= event.max_participants;
-  const pct  = capPct(event.attendee_count, event.max_participants);
+  const full     = event.attendee_count >= event.max_participants;
+  const pct      = capPct(event.attendee_count, event.max_participants);
+  const isHost   = user && event.host_id === user.id;
+  const isAdmin  = user && user.email === ADMIN_EMAIL;
+  const canDelete = isHost || isAdmin;
 
   const toggle = async () => {
     if (!user) { onShowAuth(); return; }
@@ -734,11 +773,28 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
     onRefresh("ok", nj ? "Joined! 🎉" : "Left event.");
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete this event? This cannot be undone.")) return;
+    setDeleting(true);
+    const r = await db.deleteEvent(event.id);
+    setDeleting(false);
+    if (r.error) { onRefresh("error", r.error); return; }
+    onRefresh("ok", "Event deleted.");
+    onBack();
+  };
+
   return (
     <div className="page"><div className="container" style={{ maxWidth:700 }}>
       <button className="back" onClick={onBack}>← Back to Events</button>
       <div className="dcard">
-        <div style={{ marginBottom:11 }}><CTag cat={event.category} /></div>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:11 }}>
+          <CTag cat={event.category} />
+          {canDelete && (
+            <button className="btn bd bsm" onClick={handleDelete} disabled={deleting}>
+              {deleting ? "Deleting…" : "🗑 Delete Event"}
+            </button>
+          )}
+        </div>
         <div className="dtitle">{event.title}</div>
         <div className="dgrid">
           <div className="di"><div className="di-l">Date</div><div className="di-v">📅 {fmtDate(event.date)}</div></div>
