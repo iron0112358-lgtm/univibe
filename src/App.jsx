@@ -766,7 +766,7 @@ function AuthModal({ onClose, onAuth }) {
       <div className="modal">
         <div className="mhead">
           <div style={{ display:"flex", alignItems:"center", justifyContent:"center", marginBottom:12 }}>
-            <img src="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png" alt="UniVibe" style={{ height:40, width:"auto" }} />
+            <img src="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png" alt="UniVibe" style={{ height:200, width:"auto" }} />
           </div>
           <h2>{mode === "login" ? "Welcome back" : "Join UniVibe"}</h2>
           <p>{mode === "login" ? "Sign in to join and create events" : "Start discovering campus life"}</p>
@@ -1058,7 +1058,7 @@ export default function App() {
     <div style={{ minHeight:"100vh", background:"#0E0E12", display:"flex", alignItems:"center", justifyContent:"center" }}>
       <style>{css}</style>
       <div style={{ textAlign:"center" }}>
-        <img src="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png" alt="UniVibe" style={{ height:52, width:"auto", margin:"0 auto 16px", display:"block" }} />
+        <img src="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png" alt="UniVibe" style={{ height:120, width:"auto", margin:"0 auto 16px", display:"block" }} />
         <div className="spinner" style={{ margin:"0 auto" }} />
       </div>
     </div>
