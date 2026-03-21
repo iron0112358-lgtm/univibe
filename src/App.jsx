@@ -45,9 +45,26 @@ async function sbAuth(path, body) {
   return { data, error: null };
 }
 
-// Persistent session in memory (survives re-renders, resets on page refresh)
-// For true persistence across refreshes, swap with localStorage in your own deployment
-let _session = null;
+// ─── Session Persistence ─────────────────────────────────────────────────────
+const SESSION_KEY = "univibe_session";
+
+function saveSession(s) {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch {}
+}
+function clearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch {}
+}
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s?.id || !s?.refresh_token) return null;
+    return s;
+  } catch { return null; }
+}
+
+let _session = loadSession();
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const ADMIN_EMAIL = "chichinadze.sab@gmail.com";
@@ -100,7 +117,12 @@ const db = {
         body: JSON.stringify({ id: userId, name, email }),
       });
 
-      _session = { id: userId, email, name, token };
+      _session = {
+        id: userId, email, name, token,
+        refresh_token: auth.refresh_token,
+        expires_at: Math.floor(Date.now() / 1000) + (auth.expires_in || 3600),
+      };
+      saveSession(_session);
       return { data: _session };
     }, { error: "Sign up failed. Please try again." });
   },
@@ -139,13 +161,46 @@ const db = {
         });
       }
 
-      _session = { id: userId, email, name, token };
+      _session = {
+        id: userId, email, name, token,
+        refresh_token: auth.refresh_token,
+        expires_at: Math.floor(Date.now() / 1000) + (auth.expires_in || 3600),
+      };
+      saveSession(_session);
       return { data: _session };
     }, { error: "Sign in failed. Please try again." });
   },
 
-  signOut() { _session = null; },
+  signOut() { _session = null; clearSession(); },
   getSession() { return _session; },
+
+  async refreshSession() {
+    return wrap(async () => {
+      const saved = loadSession();
+      if (!saved?.refresh_token) return null;
+      const now = Math.floor(Date.now() / 1000);
+      if (saved.expires_at && saved.expires_at > now + 60) {
+        _session = saved;
+        return _session;
+      }
+      const res = await fetch(`${SB_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: "POST",
+        headers: { "apikey": SB_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: saved.refresh_token }),
+      });
+      if (!res.ok) { clearSession(); return null; }
+      const auth = await res.json();
+      if (!auth?.access_token) { clearSession(); return null; }
+      _session = {
+        id: saved.id, email: saved.email, name: saved.name,
+        token: auth.access_token,
+        refresh_token: auth.refresh_token,
+        expires_at: Math.floor(Date.now() / 1000) + (auth.expires_in || 3600),
+      };
+      saveSession(_session);
+      return _session;
+    }, null);
+  },
 
   async getEvents(category, page = 0, search = "") {
     return wrap(async () => {
@@ -978,16 +1033,36 @@ function MyPage({ user, onSelect, onRefresh, onShowAuth }) {
 export default function App() {
   const [page, setPage]             = useState("home");
   const [selId, setSelId]           = useState(null);
-  const [user, setUser]             = useState(db.getSession());
+  const [user, setUser]             = useState(null);
   const [showAuth, setShowAuth]     = useState(false);
   const [toast, setToast]           = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [tick, setTick]             = useState(0);
+  const [booting, setBooting]       = useState(true);
+
+  // On first load: restore session from localStorage, refresh token if needed
+  useEffect(() => {
+    (async () => {
+      const restored = await db.refreshSession();
+      if (restored) setUser(restored);
+      setBooting(false);
+    })();
+  }, []);
 
   const showToast = useCallback((type, msg) => setToast({ type, msg, k: Date.now() }), []);
   const nav       = p => { setPage(p); setSelId(null); setMobileOpen(false); };
   const sel       = ev => { if (typeof ev === "string") { nav(ev); return; } setSelId(ev.id); setPage("detail"); };
   const refresh   = useCallback((type, msg) => { showToast(type, msg); setTick(t => t+1); }, [showToast]);
+
+  if (booting) return (
+    <div style={{ minHeight:"100vh", background:"#0E0E12", display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <style>{css}</style>
+      <div style={{ textAlign:"center" }}>
+        <div className="logo-mark" style={{ width:48, height:48, borderRadius:14, background:"linear-gradient(135deg,#A855F7,#F472B6)", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"Space Grotesk,sans-serif", fontWeight:800, fontSize:22, color:"#fff", margin:"0 auto 16px", boxShadow:"0 0 30px rgba(168,85,247,0.4)" }}>U</div>
+        <div className="spinner" style={{ margin:"0 auto" }} />
+      </div>
+    </div>
+  );
 
   return (
     <ErrorBoundary>
