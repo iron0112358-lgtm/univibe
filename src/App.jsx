@@ -765,8 +765,8 @@ function AuthModal({ onClose, onAuth }) {
     <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="mhead">
-          <div style={{ display:"flex", alignItems:"center", gap:8, justifyContent:"center", marginBottom:12 }}>
-            <div className="logo-mark">U</div><span className="logo-text">Uni<span>Vibe</span></span>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"center", marginBottom:12 }}>
+            <img src="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png" alt="UniVibe" style={{ height:40, width:"auto" }} />
           </div>
           <h2>{mode === "login" ? "Welcome back" : "Join UniVibe"}</h2>
           <p>{mode === "login" ? "Sign in to join and create events" : "Start discovering campus life"}</p>
@@ -1058,7 +1058,7 @@ export default function App() {
     <div style={{ minHeight:"100vh", background:"#0E0E12", display:"flex", alignItems:"center", justifyContent:"center" }}>
       <style>{css}</style>
       <div style={{ textAlign:"center" }}>
-        <div className="logo-mark" style={{ width:48, height:48, borderRadius:14, background:"linear-gradient(135deg,#A855F7,#F472B6)", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"Space Grotesk,sans-serif", fontWeight:800, fontSize:22, color:"#fff", margin:"0 auto 16px", boxShadow:"0 0 30px rgba(168,85,247,0.4)" }}>U</div>
+        <img src="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png" alt="UniVibe" style={{ height:52, width:"auto", margin:"0 auto 16px", display:"block" }} />
         <div className="spinner" style={{ margin:"0 auto" }} />
       </div>
     </div>
@@ -1070,7 +1070,7 @@ export default function App() {
         <style>{css}</style>
         <nav className="nav">
           <div className="nav-inner">
-            <div className="logo" onClick={() => nav("home")}><div className="logo-mark">U</div><span className="logo-text">Uni<span>Vibe</span></span></div>
+            <div className="logo" onClick={() => nav("home")}><img src="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png" alt="UniVibe" style={{ height:38, width:"auto", display:"block" }} /></div>
             <div className="nav-links">
               <button className={`nb ${page==="home"?"on":""}`} onClick={() => nav("home")}>Events</button>
               <button className={`nb ${page==="my"?"on":""}`}   onClick={() => nav("my")}>My Events</button>
