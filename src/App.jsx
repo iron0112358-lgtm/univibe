@@ -1070,7 +1070,7 @@ export default function App() {
         <style>{css}</style>
         <nav className="nav">
           <div className="nav-inner">
-            <div className="logo" onClick={() => nav("home")}><img src="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png" alt="UniVibe" style={{ height:38, width:"auto", display:"block" }} /></div>
+            <div className="logo" onClick={() => nav("home")}><img src="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png" alt="UniVibe" style={{ height:156, width:"auto", display:"block" }} /></div>
             <div className="nav-links">
               <button className={`nb ${page==="home"?"on":""}`} onClick={() => nav("home")}>Events</button>
               <button className={`nb ${page==="my"?"on":""}`}   onClick={() => nav("my")}>My Events</button>
