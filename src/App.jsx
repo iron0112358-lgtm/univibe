@@ -614,8 +614,12 @@ const css = `
   .trend-section{margin-bottom:32px}
   .trend-title{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:800;margin-bottom:16px;display:flex;align-items:center;gap:8px;letter-spacing:-0.3px}
   .trend-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-  .trend-card{background:var(--bg2);border:1px solid rgba(168,85,247,0.25);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:all 0.22s;position:relative;box-shadow:0 0 20px rgba(168,85,247,0.08)}
-  .trend-card:hover{transform:translateY(-5px);border-color:rgba(168,85,247,0.5);box-shadow:0 12px 40px rgba(168,85,247,0.15)}
+  .trend-card{background:var(--bg2);border:1px solid rgba(245,158,11,0.5);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:transform 0.22s,box-shadow 0.22s;position:relative;animation:goldBreath 3s ease-in-out infinite}
+  @keyframes goldBreath{
+    0%,100%{box-shadow:0 0 10px rgba(245,158,11,0.2),0 0 20px rgba(245,158,11,0.1)}
+    50%{box-shadow:0 0 22px rgba(245,158,11,0.55),0 0 44px rgba(245,158,11,0.25),0 0 60px rgba(245,158,11,0.08)}
+  }
+  .trend-card:hover{transform:translateY(-5px);box-shadow:0 0 30px rgba(245,158,11,0.6),0 0 60px rgba(245,158,11,0.3),0 16px 40px rgba(0,0,0,0.4)}
   .trend-rank{position:absolute;top:10px;right:10px;z-index:2;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:12px;color:#fff}
   .trend-rank.r1{background:linear-gradient(135deg,#F59E0B,#FCD34D);color:#0E0E12}
   .trend-rank.r2{background:linear-gradient(135deg,#9CA3AF,#D1D5DB);color:#0E0E12}
