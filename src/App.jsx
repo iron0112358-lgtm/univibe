@@ -203,6 +203,46 @@ const db = {
     }, null);
   },
 
+  async getTrending() {
+    return wrap(async () => {
+      // Get top 3 events by attendee count
+      const evRes = await fetch(
+        `${SB_URL}/rest/v1/events?select=id,title,description,date,location,category,host_id,max_participants,created_at&order=created_at.desc&limit=50`,
+        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+      );
+      const events = await evRes.json();
+      if (!Array.isArray(events) || events.length === 0) return [];
+
+      // Get attendee counts for all
+      const ids = events.map(e => e.id).join(",");
+      const attRes = await fetch(
+        `${SB_URL}/rest/v1/event_attendees?select=event_id&event_id=in.(${ids})`,
+        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+      );
+      const att = await attRes.json();
+      const countMap = {};
+      (att || []).forEach(r => { countMap[r.event_id] = (countMap[r.event_id] || 0) + 1; });
+
+      // Sort by count, take top 3
+      const sorted = events
+        .map(e => ({ ...e, attendee_count: countMap[e.id] || 0 }))
+        .sort((a, b) => b.attendee_count - a.attendee_count)
+        .slice(0, 3);
+
+      // Fetch host names
+      const hostIds = [...new Set(sorted.map(e => e.host_id).filter(Boolean))];
+      let nameMap = {};
+      if (hostIds.length) {
+        const nRes = await fetch(`${SB_URL}/rest/v1/users?id=in.(${hostIds.join(",")})&select=id,name`,
+          { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } });
+        const names = await nRes.json();
+        (names || []).forEach(u => { nameMap[u.id] = u.name; });
+      }
+
+      return sorted.map(e => ({ ...e, host_name: nameMap[e.host_id] || "Unknown" }));
+    }, []);
+  },
+
   async getEvents(category, page = 0, search = "") {
     return wrap(async () => {
       const from = page * PAGE_SIZE;
@@ -569,6 +609,18 @@ const css = `
   .c-r{background:linear-gradient(90deg,#DB2777,#F472B6)}
   .efoot{display:flex;align-items:center;justify-content:space-between}
   .ecnt{font-size:11px;color:var(--muted);font-weight:600}
+  .share-btn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:4px 7px;border-radius:8px;transition:all 0.16s;display:flex;align-items:center;gap:4px}
+  .share-btn:hover{color:var(--purple);background:rgba(168,85,247,0.1)}
+  .trend-section{margin-bottom:32px}
+  .trend-title{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:800;margin-bottom:16px;display:flex;align-items:center;gap:8px;letter-spacing:-0.3px}
+  .trend-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .trend-card{background:var(--bg2);border:1px solid rgba(168,85,247,0.25);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:all 0.22s;position:relative;box-shadow:0 0 20px rgba(168,85,247,0.08)}
+  .trend-card:hover{transform:translateY(-5px);border-color:rgba(168,85,247,0.5);box-shadow:0 12px 40px rgba(168,85,247,0.15)}
+  .trend-rank{position:absolute;top:10px;right:10px;z-index:2;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:12px;color:#fff}
+  .trend-rank.r1{background:linear-gradient(135deg,#F59E0B,#FCD34D);color:#0E0E12}
+  .trend-rank.r2{background:linear-gradient(135deg,#9CA3AF,#D1D5DB);color:#0E0E12}
+  .trend-rank.r3{background:linear-gradient(135deg,#B45309,#D97706);color:#fff}
+  @media(max-width:768px){.trend-grid{grid-template-columns:1fr}}
 
   /* BUTTONS */
   .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:100px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.18s;border:none;letter-spacing:0.01em}
@@ -671,6 +723,17 @@ const css = `
   }
 `;
 
+// ─── Share Utility ────────────────────────────────────────────────────────────
+function shareEvent(eventId, title) {
+  const url = `${window.location.origin}${window.location.pathname}?event=${eventId}`;
+  if (navigator.share) {
+    navigator.share({ title: `UniVibe: ${title}`, url }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(url).then(() => {}).catch(() => {});
+  }
+  return url;
+}
+
 // ─── Small Components ─────────────────────────────────────────────────────────
 function Toast({ msg, type, onClose }) {
   useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
@@ -741,7 +804,10 @@ function ECard({ event, user, onSelect, onAction }) {
         <CBar count={event.attendee_count} max={event.max_participants} />
         <div className="efoot">
           <span className="ecnt">{event.attendee_count}/{event.max_participants} joined</span>
-          <JoinBtn event={event} user={user} onAction={onAction} />
+          <div style={{ display:"flex", gap:5, alignItems:"center" }}>
+            <button className="share-btn" onClick={e => { e.stopPropagation(); shareEvent(event.id, event.title); onAction("share"); }} title="Copy link">🔗</button>
+            <JoinBtn event={event} user={user} onAction={onAction} />
+          </div>
         </div>
       </div>
     </div>
@@ -783,6 +849,53 @@ function AuthModal({ onClose, onAuth }) {
   );
 }
 
+// ─── Trending Section ─────────────────────────────────────────────────────────
+function TrendingSection({ user, onSelect, onShowAuth, onRefresh }) {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const data = await db.getTrending();
+      setEvents(data); setLoading(false);
+    })();
+  }, []);
+
+  if (loading || events.length === 0) return null;
+
+  const rankClass = ["r1","r2","r3"];
+  const rankLabel = ["🥇","🥈","🥉"];
+
+  return (
+    <div className="trend-section">
+      <div className="trend-title">🔥 Trending on Campus</div>
+      <div className="trend-grid">
+        {events.map((event, i) => (
+          <div key={event.id} className="trend-card" onClick={() => onSelect(event)}>
+            <div className={`ecard-banner ecard-banner-${event.category}`} style={{ height:70 }}>
+              <div className="ecard-head" style={{ padding:"10px 12px" }}>
+                <CTag cat={event.category} />
+              </div>
+            </div>
+            <div className={`trend-rank ${rankClass[i]}`}>{i+1}</div>
+            <div style={{ padding:"12px 14px 14px" }}>
+              <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:15, marginBottom:8, lineHeight:1.3 }}>{trunc(event.title, 60)}</div>
+              <div style={{ fontSize:11, color:"var(--muted2)", marginBottom:10 }}>📅 {fmtDate(event.date)} · 📍 {trunc(event.location, 40)}</div>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                  <span style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:800, fontSize:18, background:"linear-gradient(135deg,var(--purple),var(--pink))", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{event.attendee_count}</span>
+                  <span style={{ fontSize:11, color:"var(--muted)" }}>/ {event.max_participants} joined</span>
+                </div>
+                <button className="share-btn" onClick={e => { e.stopPropagation(); shareEvent(event.id, event.title); onRefresh("ok", "Link copied! 🔗"); }} title="Copy link">🔗</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Home Page ────────────────────────────────────────────────────────────────
 function HomePage({ user, onSelect, onRefresh, onShowAuth }) {
   const [cat, setCat]         = useState("All");
@@ -806,6 +919,8 @@ function HomePage({ user, onSelect, onRefresh, onShowAuth }) {
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const act = useCallback(async a => {
     if (a === "auth")           { onShowAuth(); return; }
+    if (a === "share")          { onRefresh("ok", "Link copied! 🔗"); return; }
+    if (a === "deleted")        { await load(); onRefresh("ok", "Event deleted."); return; }
     if (a.startsWith("error:")) { onRefresh("error", a.slice(6)); return; }
     await load(); onRefresh("ok", a === "joined" ? "Joined! 🎉" : "Left event.");
   }, [load, onRefresh, onShowAuth]);
@@ -827,8 +942,9 @@ function HomePage({ user, onSelect, onRefresh, onShowAuth }) {
         <div className="scard"><div className="snum">{VALID_CATS.length}</div><div className="slbl">Categories</div></div>
         <div className="scard"><div className="snum">{CAT_ICON[stats.topCategory] || "—"}</div><div className="slbl">{stats.topCategory !== "—" ? stats.topCategory : "No events yet"}</div></div>
       </div>
+      <TrendingSection user={user} onSelect={onSelect} onShowAuth={onShowAuth} onRefresh={onRefresh} />
       <div id="feed">
-        <div className="stitle">🔥 What's Happening</div>
+        <div className="stitle">✨ All Events</div>
         <div className="sbar">
           <span style={{ color:"var(--muted)", fontSize:13 }}>🔍</span>
           <input placeholder="Search events, locations…" value={search} onChange={e => setSearch(e.target.value)} maxLength={200} />
@@ -934,6 +1050,7 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
               ? <button className="btn bf blg" disabled>Event Full</button>
               : <button className={`btn blg ${joined?"bd":"bp"}`} onClick={toggle} disabled={acting}>{acting ? "…" : joined ? "Leave Event" : "✦ Join Event"}</button>
             }
+            <button className="btn bg blg" onClick={() => { shareEvent(event.id, event.title); onRefresh("ok", "Link copied! 🔗"); }}>🔗 Share</button>
             <button className="btn bg blg" onClick={onBack}>← Back</button>
           </div>
         </div>
@@ -1041,11 +1158,20 @@ export default function App() {
   const [tick, setTick]             = useState(0);
   const [booting, setBooting]       = useState(true);
 
-  // On first load: restore session from localStorage, refresh token if needed
+  // On first load: restore session + handle shared event links
   useEffect(() => {
     (async () => {
       const restored = await db.refreshSession();
       if (restored) setUser(restored);
+      // Deep link: ?event=ID opens that event directly
+      const params = new URLSearchParams(window.location.search);
+      const eventId = params.get("event");
+      if (eventId) {
+        setSelId(eventId);
+        setPage("detail");
+        // Clean URL without reload
+        window.history.replaceState({}, "", window.location.pathname);
+      }
       setBooting(false);
     })();
   }, []);
