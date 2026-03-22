@@ -406,6 +406,24 @@ const db = {
     }, { error: "Could not delete event." });
   },
 
+  async getParticipants(eventId) {
+    return wrap(async () => {
+      const attRes = await fetch(
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&select=user_id`,
+        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+      );
+      const att = await attRes.json();
+      if (!Array.isArray(att) || att.length === 0) return [];
+      const ids = att.map(a => a.user_id).join(",");
+      const usersRes = await fetch(
+        `${SB_URL}/rest/v1/users?id=in.(${ids})&select=id,name,email`,
+        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+      );
+      const users = await usersRes.json();
+      return Array.isArray(users) ? users : [];
+    }, []);
+  },
+
   async isJoined(eventId, userId) {
     return wrap(async () => {
       const res = await fetch(
@@ -645,6 +663,18 @@ const css = `
   .trend-rank.r2{background:linear-gradient(135deg,#9CA3AF,#D1D5DB);color:#0E0E12}
   .trend-rank.r3{background:linear-gradient(135deg,#B45309,#D97706);color:#fff}
   @media(max-width:768px){.trend-grid{grid-template-columns:1fr}}
+
+  /* PARTICIPANTS PANEL */
+  .part-panel{margin-top:20px;background:var(--bg3);border-radius:16px;overflow:hidden;border:1px solid var(--border)}
+  .part-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:pointer;transition:background 0.16s}
+  .part-header:hover{background:var(--bg4)}
+  .part-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
+  .part-list{padding:0 18px 14px;display:flex;flex-direction:column;gap:8px}
+  .part-item{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg2);border-radius:12px;border:1px solid var(--border)}
+  .part-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--pink));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;flex-shrink:0}
+  .part-name{font-weight:600;font-size:13px;margin-bottom:2px}
+  .part-email{font-size:11px;color:var(--muted);font-weight:400}
+  .part-num{font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:13px;color:var(--purple);background:rgba(168,85,247,0.1);padding:3px 9px;border-radius:100px}
 
   /* BUTTONS */
   .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:100px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.18s;border:none;letter-spacing:0.01em}
@@ -1042,11 +1072,14 @@ function HomePage({ user, onSelect, onRefresh, onShowAuth }) {
 
 // ─── Detail Page ──────────────────────────────────────────────────────────────
 function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
-  const [event,    setEvent]   = useState(null);
-  const [joined,   setJoined]  = useState(false);
-  const [loading,  setLoading] = useState(true);
-  const [acting,   setActing]  = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [event,        setEvent]       = useState(null);
+  const [joined,       setJoined]      = useState(false);
+  const [loading,      setLoading]     = useState(true);
+  const [acting,       setActing]      = useState(false);
+  const [deleting,     setDeleting]    = useState(false);
+  const [showParts,    setShowParts]   = useState(false);
+  const [participants, setParticipants] = useState([]);
+  const [partsLoading, setPartsLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -1063,7 +1096,15 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
   const pct      = capPct(event.attendee_count, event.max_participants);
   const isHost   = user && event.host_id === user.id;
   const isAdmin  = user && user.email === ADMIN_EMAIL;
-  const canDelete = isHost || isAdmin;
+  const canDelete        = isHost || isAdmin;
+  const canViewParticipants = isHost || isAdmin;
+
+  const loadParticipants = async () => {
+    if (showParts) { setShowParts(false); return; }
+    setPartsLoading(true); setShowParts(true);
+    const data = await db.getParticipants(event.id);
+    setParticipants(data); setPartsLoading(false);
+  };
 
   const toggle = async () => {
     if (!user) { onShowAuth(); return; }
@@ -1125,6 +1166,38 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
             <button className="btn bg blg" onClick={() => { shareEvent(event.id, event.title); onRefresh("ok", "Link copied! 🔗"); }}>🔗 Share</button>
             <button className="btn bg blg" onClick={onBack}>← Back</button>
           </div>
+
+          {canViewParticipants && (
+            <div className="part-panel">
+              <div className="part-header" onClick={loadParticipants}>
+                <div className="part-title">
+                  👥 Participants
+                  <span className="part-num">{event.attendee_count}</span>
+                </div>
+                <span style={{ color:"var(--muted)", fontSize:13 }}>{showParts ? "▲ Hide" : "▼ Show"}</span>
+              </div>
+              {showParts && (
+                <div className="part-list">
+                  {partsLoading ? (
+                    <div style={{ textAlign:"center", padding:"16px 0", color:"var(--muted)", fontSize:13 }}>Loading…</div>
+                  ) : participants.length === 0 ? (
+                    <div style={{ textAlign:"center", padding:"16px 0", color:"var(--muted)", fontSize:13 }}>No participants yet.</div>
+                  ) : (
+                    participants.map((p, i) => (
+                      <div key={p.id} className="part-item">
+                        <div className="part-avatar">{p.name?.[0]?.toUpperCase() || "?"}</div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div className="part-name">{p.name}</div>
+                          <div className="part-email">{p.email}</div>
+                        </div>
+                        <span style={{ fontSize:11, color:"var(--muted)", fontWeight:600 }}>#{i+1}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div></div>
