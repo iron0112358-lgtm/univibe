@@ -582,35 +582,55 @@ const css = `
   .sbar-x:hover{color:var(--text)}
 
   /* GRID */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:22px}
 
-  /* EVENT CARD */
-  .ecard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:all 0.22s;position:relative}
-  .ecard:hover{transform:translateY(-5px);border-color:var(--border2);box-shadow:0 20px 48px rgba(0,0,0,0.4)}
-  .ecard-banner{height:90px;position:relative;display:flex;align-items:flex-end;padding:12px 14px}
-  .ecard-banner-Tech{background:linear-gradient(135deg,#4F46E5,#7C3AED,#A855F7)}
-  .ecard-banner-Sports{background:linear-gradient(135deg,#059669,#10B981,#A3E635)}
-  .ecard-banner-Social{background:linear-gradient(135deg,#DB2777,#F472B6,#FB923C)}
-  .ecard-banner-Education{background:linear-gradient(135deg,#2563EB,#60A5FA,#22D3EE)}
-  .ecard-banner-Entrepreneurship{background:linear-gradient(135deg,#D97706,#FB923C,#FCD34D)}
-  .ecard-banner::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,0.35))}
-  .ecard-head{position:relative;z-index:1;display:flex;justify-content:space-between;align-items:center;width:100%}
-  .ctag{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:100px;font-size:10px;font-weight:700;background:rgba(255,255,255,0.2);color:#fff;backdrop-filter:blur(8px);letter-spacing:0.04em;text-transform:uppercase}
-  .badge-new{background:var(--lime);color:#0E0E12;padding:2px 8px;border-radius:100px;font-size:9px;font-weight:800;letter-spacing:0.06em}
-  .ecard-body{padding:14px 16px 16px}
-  .etitle{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;margin-bottom:10px;line-height:1.3;letter-spacing:-0.3px}
-  .emeta{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+  /* EVENT CARD — Concert Poster Style */
+  .ecard{background:var(--bg2);border:1px solid var(--border);border-radius:24px;overflow:hidden;cursor:pointer;transition:all 0.25s cubic-bezier(0.34,1.56,0.64,1);position:relative;display:flex;flex-direction:column}
+  .ecard:hover{transform:translateY(-8px) scale(1.01);border-color:var(--border2);box-shadow:0 28px 60px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.05)}
+
+  /* Banner with diagonal shimmer */
+  .ecard-banner{height:130px;position:relative;display:flex;flex-direction:column;justify-content:space-between;padding:14px 14px 0;overflow:hidden}
+  .ecard-banner::before{content:'';position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.07) 50%,transparent 60%);transform:translateX(-100%);transition:transform 0.6s ease}
+  .ecard:hover .ecard-banner::before{transform:translateX(200%)}
+  .ecard-banner::after{content:'';position:absolute;bottom:0;left:0;right:0;height:50px;background:linear-gradient(to bottom,transparent,rgba(0,0,0,0.45))}
+  .ecard-banner-Tech{background:linear-gradient(135deg,#312E81,#4F46E5,#7C3AED,#A855F7)}
+  .ecard-banner-Sports{background:linear-gradient(135deg,#064E3B,#059669,#10B981,#A3E635)}
+  .ecard-banner-Social{background:linear-gradient(135deg,#831843,#DB2777,#F472B6,#FB923C)}
+  .ecard-banner-Education{background:linear-gradient(135deg,#1E3A8A,#2563EB,#60A5FA,#22D3EE)}
+  .ecard-banner-Entrepreneurship{background:linear-gradient(135deg,#78350F,#D97706,#FB923C,#FCD34D)}
+
+  /* Wavy ticket tear separator */
+  .ecard-wave{width:100%;overflow:hidden;line-height:0;margin-top:-1px;position:relative;z-index:1}
+  .ecard-wave svg{display:block;width:100%;height:18px}
+
+  .ecard-head{position:relative;z-index:2;display:flex;justify-content:space-between;align-items:flex-start}
+  .ctag{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:100px;font-size:10px;font-weight:700;background:rgba(255,255,255,0.18);color:#fff;backdrop-filter:blur(10px);letter-spacing:0.05em;text-transform:uppercase;border:1px solid rgba(255,255,255,0.15)}
+  .badge-new{background:var(--lime);color:#0E0E12;padding:3px 9px;border-radius:100px;font-size:9px;font-weight:800;letter-spacing:0.06em;box-shadow:0 0 10px rgba(163,230,53,0.4)}
+
+  /* Card body with subtle dot texture */
+  .ecard-body{padding:14px 16px 0;flex:1;position:relative}
+  .ecard-body::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,rgba(255,255,255,0.025) 1px,transparent 1px);background-size:18px 18px;pointer-events:none}
+  .etitle{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:800;margin-bottom:10px;line-height:1.25;letter-spacing:-0.4px;position:relative}
+  .emeta{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;position:relative}
   .emr{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted2);font-weight:500}
-  .cbar{height:4px;background:var(--bg4);border-radius:100px;margin-bottom:14px;overflow:hidden}
-  .cfill{height:100%;border-radius:100px;transition:width 0.3s ease}
+
+  /* Participant bar */
+  .cbar{height:4px;background:var(--bg4);border-radius:100px;margin-bottom:0;overflow:hidden;position:relative}
+  .cfill{height:100%;border-radius:100px;transition:width 0.6s cubic-bezier(0.34,1.56,0.64,1)}
   .c-g{background:linear-gradient(90deg,#059669,#A3E635)}
   .c-a{background:linear-gradient(90deg,#D97706,#FB923C)}
   .c-o{background:linear-gradient(90deg,#EA580C,#F97316)}
   .c-r{background:linear-gradient(90deg,#DB2777,#F472B6)}
-  .efoot{display:flex;align-items:center;justify-content:space-between}
+
+  /* Footer — full width join button */
+  .ecard-footer{padding:12px 16px 16px;position:relative}
+  .ecard-footer::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,rgba(255,255,255,0.025) 1px,transparent 1px);background-size:18px 18px;pointer-events:none}
+  .ecnt-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
   .ecnt{font-size:11px;color:var(--muted);font-weight:600}
-  .share-btn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:4px 7px;border-radius:8px;transition:all 0.16s;display:flex;align-items:center;gap:4px}
-  .share-btn:hover{color:var(--purple);background:rgba(168,85,247,0.1)}
+  .ecard-actions{display:flex;gap:8px;align-items:center}
+  .join-full{flex:1}
+  .share-btn{background:none;border:1px solid var(--border2);cursor:pointer;color:var(--muted2);font-size:13px;padding:7px 11px;border-radius:100px;transition:all 0.18s;display:flex;align-items:center}
+  .share-btn:hover{color:var(--purple);border-color:rgba(168,85,247,0.4);background:rgba(168,85,247,0.08)}
   .trend-section{margin-bottom:32px}
   .trend-title{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:800;margin-bottom:16px;display:flex;align-items:center;gap:8px;letter-spacing:-0.3px}
   .trend-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
@@ -775,11 +795,38 @@ function JoinBtn({ event, user, onAction }) {
   return                      <button className="btn bp bsm" onClick={click}>Join ✦</button>;
 }
 
+function JoinBtnFull({ event, user, onAction }) {
+  const [joined,  setJoined]  = useState(false);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!user) { setJoined(false); return; }
+    db.isJoined(event.id, user.id).then(setJoined);
+  }, [event.id, user]);
+  const full = event.attendee_count >= event.max_participants;
+  const click = async e => {
+    e.stopPropagation();
+    if (!user) { onAction("auth"); return; }
+    setLoading(true);
+    const r = joined ? await db.leaveEvent(event.id, user.id) : await db.joinEvent(event.id, user.id);
+    setLoading(false);
+    if (r.error) { onAction("error:" + r.error); return; }
+    setJoined(!joined);
+    onAction(joined ? "left" : "joined");
+  };
+  const base = { width:"100%", justifyContent:"center", borderRadius:14, padding:"10px 0", fontSize:13, fontWeight:700, letterSpacing:"0.02em" };
+  if (loading)         return <button className="btn bf" style={base} disabled>…</button>;
+  if (full && !joined) return <button className="btn bf" style={base} disabled>Event Full</button>;
+  if (joined)          return <button className="btn bd" style={base} onClick={click}>✓ Going · Leave</button>;
+  return                      <button className="btn bp" style={base} onClick={click}>✦ Join Event</button>;
+}
+
 function ECard({ event, user, onSelect, onAction }) {
-  const isNew    = Date.now() - new Date(event.created_at).getTime() < 172800000;
-  const isHost   = user && event.host_id === user.id;
-  const isAdmin  = user && user.email === ADMIN_EMAIL;
+  const isNew     = Date.now() - new Date(event.created_at).getTime() < 172800000;
+  const isHost    = user && event.host_id === user.id;
+  const isAdmin   = user && user.email === ADMIN_EMAIL;
   const canDelete = isHost || isAdmin;
+  const pct       = capPct(event.attendee_count, event.max_participants);
+  const barCls    = pct >= 100 ? "c-r" : pct >= 80 ? "c-o" : pct >= 50 ? "c-a" : "c-g";
 
   const handleDelete = async e => {
     e.stopPropagation();
@@ -791,27 +838,48 @@ function ECard({ event, user, onSelect, onAction }) {
 
   return (
     <div className="ecard" onClick={() => onSelect(event)} role="button" tabIndex={0} onKeyDown={e => e.key === "Enter" && onSelect(event)}>
-      <div className="ecard-head">
-        <CTag cat={event.category} />
-        <div style={{ display:"flex", gap:5, alignItems:"center" }}>
-          {isNew && <span className="badge-new">NEW</span>}
-          {canDelete && <button className="btn bd bsm" onClick={handleDelete} style={{ fontSize:10, padding:"2px 8px" }}>🗑</button>}
+      <div className={`ecard-banner ecard-banner-${event.category}`}>
+        <div className="ecard-head">
+          <CTag cat={event.category} />
+          <div style={{ display:"flex", gap:5, alignItems:"center" }}>
+            {isNew && <span className="badge-new">NEW</span>}
+            {canDelete && (
+              <button className="btn bsm" onClick={handleDelete}
+                style={{ fontSize:10, padding:"3px 9px", background:"rgba(0,0,0,0.4)", color:"#fff", border:"1px solid rgba(255,255,255,0.2)", backdropFilter:"blur(8px)", borderRadius:100 }}>
+                🗑
+              </button>
+            )}
+          </div>
+        </div>
+        <div style={{ position:"relative", zIndex:2, paddingBottom:8 }}>
+          <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:800, fontSize:17, color:"#fff", lineHeight:1.2, letterSpacing:"-0.3px", textShadow:"0 2px 12px rgba(0,0,0,0.5)" }}>
+            {trunc(event.title, 55)}
+          </div>
         </div>
       </div>
+      <div className="ecard-wave">
+        <svg viewBox="0 0 400 18" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M0,0 C20,18 40,0 60,9 C80,18 100,0 120,9 C140,18 160,0 180,9 C200,18 220,0 240,9 C260,18 280,0 300,9 C320,18 340,0 360,9 C380,18 400,0 400,0 L400,18 L0,18 Z" fill="#16161C"/>
+        </svg>
+      </div>
       <div className="ecard-body">
-        <div className="etitle">{trunc(event.title, 100)}</div>
         <div className="emeta">
           <div className="emr">📅 {fmtDate(event.date)} · {fmtTime(event.date)}</div>
-          <div className="emr">📍 {trunc(event.location, 70)}</div>
-          <div className="emr">👤 {trunc(event.host_name, 50)}</div>
+          <div className="emr">📍 {trunc(event.location, 60)}</div>
+          <div className="emr">👤 {trunc(event.host_name, 40)}</div>
         </div>
-        <CBar count={event.attendee_count} max={event.max_participants} />
-        <div className="efoot">
-          <span className="ecnt">{event.attendee_count}/{event.max_participants} joined</span>
-          <div style={{ display:"flex", gap:5, alignItems:"center" }}>
-            <button className="share-btn" onClick={e => { e.stopPropagation(); shareEvent(event.id, event.title); onAction("share"); }} title="Copy link">🔗</button>
-            <JoinBtn event={event} user={user} onAction={onAction} />
+      </div>
+      <div className="ecard-footer">
+        <div className="ecnt-row">
+          <span className="ecnt">{event.attendee_count}/{event.max_participants} going</span>
+          <span style={{ fontSize:11, color:"var(--muted)", fontWeight:600 }}>{pct}% full</span>
+        </div>
+        <div className="cbar" style={{ marginBottom:12 }}><div className={`cfill ${barCls}`} style={{ width:`${pct}%` }} /></div>
+        <div className="ecard-actions">
+          <div className="join-full" onClick={e => e.stopPropagation()}>
+            <JoinBtnFull event={event} user={user} onAction={onAction} />
           </div>
+          <button className="share-btn" onClick={e => { e.stopPropagation(); shareEvent(event.id, event.title); onAction("share"); }} title="Share">🔗</button>
         </div>
       </div>
     </div>
