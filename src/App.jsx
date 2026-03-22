@@ -97,6 +97,7 @@ const db = {
       email = String(email || "").trim().toLowerCase();
       if (!name)  return { error: "Name is required." };
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email." };
+      if (!email.endsWith("@kiu.edu.ge")) return { error: "Only KIU university emails (@kiu.edu.ge) are allowed." };
       if (String(password || "").length < 6) return { error: "Password must be 6+ characters." };
 
       const { data: auth, error: authErr } = await sbAuth("signup", { email, password });
@@ -772,7 +773,7 @@ function AuthModal({ onClose, onAuth }) {
           <p>{mode === "login" ? "Sign in to join and create events" : "Start discovering campus life"}</p>
         </div>
         {mode === "signup" && <div className="fg"><label className="fl">Full Name</label><input className="fi" placeholder="Your name" value={form.name} onChange={e => set("name", e.target.value)} maxLength={100} /></div>}
-        <div className="fg"><label className="fl">Email</label><input className="fi" type="email" placeholder="you@university.edu" value={form.email} onChange={e => set("email", e.target.value)} maxLength={200} /></div>
+        <div className="fg"><label className="fl">Email</label><input className="fi" type="email" placeholder="you@kiu.edu.ge" value={form.email} onChange={e => set("email", e.target.value)} maxLength={200} /></div>
         <div className="fg"><label className="fl">Password</label><input className="fi" type="password" placeholder="••••••••" value={form.password} onChange={e => set("password", e.target.value)} onKeyDown={e => e.key === "Enter" && !loading && go()} maxLength={200} /></div>
         {error && <div className="ferr">{error}</div>}
         <button className="btn bp" style={{ width:"100%", justifyContent:"center", marginTop:18, borderRadius:14, padding:"13px 0", fontSize:15 }} onClick={go} disabled={loading}>{loading ? "Please wait…" : mode === "login" ? "Sign In →" : "Create Account →"}</button>
