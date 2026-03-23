@@ -471,8 +471,20 @@ const db = {
         (names || []).forEach(u => { nameMap[u.id] = u.name; });
       }
 
+      // Fetch real attendee counts
+      const allIds = allEvents.map(e => `"${e.id}"`).join(",");
+      let countMap = {};
+      if (allIds.length) {
+        const cRes = await fetch(
+          `${SB_URL}/rest/v1/event_attendees?select=event_id&event_id=in.(${allIds})`,
+          { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+        );
+        const counts = await cRes.json();
+        (counts || []).forEach(r => { countMap[r.event_id] = (countMap[r.event_id] || 0) + 1; });
+      }
+
       const fmt = arr => (Array.isArray(arr) ? arr : []).map(e => ({
-        ...e, host_name: nameMap[e.host_id] || "Unknown", attendee_count: 0,
+        ...e, host_name: nameMap[e.host_id] || "Unknown", attendee_count: countMap[e.id] || 0,
       }));
       return { joined: fmt(joinedRaw), created: fmt(createdRaw) };
     }, { joined: [], created: [] });
@@ -663,6 +675,20 @@ const css = `
   .trend-rank.r2{background:linear-gradient(135deg,#9CA3AF,#D1D5DB);color:#0E0E12}
   .trend-rank.r3{background:linear-gradient(135deg,#B45309,#D97706);color:#fff}
   @media(max-width:768px){.trend-grid{grid-template-columns:1fr}}
+
+  /* PROFILE HEADER */
+  .profile-header{background:var(--bg2);border:1px solid var(--border);border-radius:24px;padding:24px;margin-bottom:24px;display:flex;align-items:center;gap:20px;position:relative;overflow:hidden}
+  .profile-header::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 0% 50%,rgba(168,85,247,0.07),transparent);pointer-events:none}
+  .profile-avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--pink));display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:26px;color:#fff;flex-shrink:0;box-shadow:0 0 24px var(--glow-purple)}
+  .profile-info{flex:1;min-width:0}
+  .profile-name{font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:22px;letter-spacing:-0.5px;margin-bottom:3px}
+  .profile-email{font-size:12px;color:var(--muted);margin-bottom:10px}
+  .profile-stats{display:flex;gap:16px;flex-wrap:wrap}
+  .profile-stat{display:flex;flex-direction:column;align-items:center;background:var(--bg3);border-radius:12px;padding:8px 16px;border:1px solid var(--border)}
+  .profile-stat-num{font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:20px;background:linear-gradient(135deg,var(--purple),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  .profile-stat-lbl{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-top:2px}
+  .profile-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(163,230,53,0.1);border:1px solid rgba(163,230,53,0.25);color:var(--lime);padding:4px 12px;border-radius:100px;font-size:11px;font-weight:700;margin-top:8px}
+  @media(max-width:480px){.profile-header{flex-direction:column;text-align:center}.profile-stats{justify-content:center}}
 
   /* PARTICIPANTS PANEL */
   .part-panel{margin-top:20px;background:var(--bg3);border-radius:16px;overflow:hidden;border:1px solid var(--border)}
@@ -1267,9 +1293,13 @@ function MyPage({ user, onSelect, onRefresh, onShowAuth }) {
 
   if (!user) return <div className="page"><div className="container"><div className="empty"><div className="eico">🎟️</div><h3>Sign in to see your events</h3><button className="btn bp" style={{ marginTop:14 }} onClick={onShowAuth}>Sign In</button></div></div></div>;
 
-  const list = tab === "joined" ? data.joined : data.created;
+  const list    = tab === "joined" ? data.joined : data.created;
+  const isAdmin = user.email === ADMIN_EMAIL;
+  const memberSince = new Date(user.created_at || Date.now()).getFullYear();
   const act  = async a => {
     if (a === "auth")           { onShowAuth(); return; }
+    if (a === "share")          { onRefresh("ok", "Link copied! 🔗"); return; }
+    if (a === "deleted")        { const d = await db.getMyEvents(user.id); setData(d); onRefresh("ok", "Event deleted."); return; }
     if (a.startsWith("error:")) { onRefresh("error", a.slice(6)); return; }
     const d = await db.getMyEvents(user.id); setData(d);
     onRefresh("ok", a === "joined" ? "Joined! 🎉" : "Left event.");
@@ -1277,15 +1307,38 @@ function MyPage({ user, onSelect, onRefresh, onShowAuth }) {
 
   return (
     <div className="page"><div className="container">
-      <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:26, fontWeight:800, letterSpacing:"-0.5px", marginBottom:5 }}>My Events</div>
-      <p style={{ color:"var(--muted)", fontSize:12, marginBottom:18 }}>Hello, {user.name} 👋</p>
+
+      {/* Profile Header */}
+      <div className="profile-header">
+        <div className="profile-avatar">{user.name?.[0]?.toUpperCase() || "?"}</div>
+        <div className="profile-info">
+          <div className="profile-name">{user.name}</div>
+          <div className="profile-email">{user.email}</div>
+          <div className="profile-stats">
+            <div className="profile-stat">
+              <span className="profile-stat-num">{data.joined.length}</span>
+              <span className="profile-stat-lbl">Joined</span>
+            </div>
+            <div className="profile-stat">
+              <span className="profile-stat-num">{data.created.length}</span>
+              <span className="profile-stat-lbl">Hosted</span>
+            </div>
+            <div className="profile-stat">
+              <span className="profile-stat-num">{data.joined.length + data.created.length}</span>
+              <span className="profile-stat-lbl">Total</span>
+            </div>
+          </div>
+          {isAdmin && <div className="profile-badge">⚡ Platform Admin</div>}
+        </div>
+      </div>
+
       <div className="tabs">
         <button className={`tab ${tab==="joined"?"on":""}`} onClick={() => setTab("joined")}>🎟️ Joined ({data.joined.length})</button>
         <button className={`tab ${tab==="created"?"on":""}`} onClick={() => setTab("created")}>✦ Created ({data.created.length})</button>
       </div>
       {loading ? <Spinner />
         : list.length === 0
-        ? <div className="empty"><div className="eico">{tab==="joined"?"🔍":"✨"}</div><h3>{tab==="joined"?"No events joined yet":"No events created yet"}</h3><p>{tab==="joined"?"Browse events on the home page.":"Host your first campus event!"}</p></div>
+        ? <div className="empty"><div className="eico">{tab==="joined"?"🔍":"✨"}</div><h3>{tab==="joined"?"No events joined yet":"No events created yet"}</h3><p>{tab==="joined"?"Browse events and join something!":"Host your first campus event!"}</p></div>
         : <div className="grid">{list.map(e => <ECard key={e.id} event={e} user={user} onSelect={onSelect} onAction={act} />)}</div>
       }
     </div></div>
