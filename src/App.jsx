@@ -207,7 +207,7 @@ const db = {
     return wrap(async () => {
       // Get top 3 events by attendee count
       const evRes = await fetch(
-        `${SB_URL}/rest/v1/events?select=id,title,description,date,location,category,host_id,max_participants,created_at&order=created_at.desc&limit=50`,
+        `${SB_URL}/rest/v1/events?select=id,title,description,date,location,category,host_id,max_participants,created_at,is_private&order=created_at.desc&limit=50`,
         { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
       );
       const events = await evRes.json();
@@ -216,7 +216,7 @@ const db = {
       // Get attendee counts for all
       const ids = events.map(e => e.id).join(",");
       const attRes = await fetch(
-        `${SB_URL}/rest/v1/event_attendees?select=event_id&event_id=in.(${ids})`,
+        `${SB_URL}/rest/v1/event_attendees?select=event_id&status=eq.approved&event_id=in.(${ids})`,
         { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
       );
       const att = await attRes.json();
@@ -248,7 +248,7 @@ const db = {
       const from = page * PAGE_SIZE;
 
       // Fetch events without join
-      let url = `${SB_URL}/rest/v1/events?select=id,title,description,date,location,category,host_id,max_participants,created_at&order=created_at.desc`;
+      let url = `${SB_URL}/rest/v1/events?select=id,title,description,date,location,category,host_id,max_participants,created_at,is_private&order=created_at.desc`;
       if (category && category !== "All") url += `&category=eq.${encodeURIComponent(category)}`;
       if (search?.trim()) url += `&title=ilike.${encodeURIComponent("*" + search.trim() + "*")}`;
       url += `&offset=${from}&limit=${PAGE_SIZE}`;
@@ -282,7 +282,7 @@ const db = {
       let countMap = {};
       if (ids.length) {
         const attRes = await fetch(
-          `${SB_URL}/rest/v1/event_attendees?select=event_id&event_id=in.(${ids})`,
+          `${SB_URL}/rest/v1/event_attendees?select=event_id&status=eq.approved&event_id=in.(${ids})`,
           { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session?.token || SB_KEY}` } }
         );
         const att = await attRes.json();
@@ -300,7 +300,7 @@ const db = {
 
   async getEvent(id) {
     return wrap(async () => {
-      const evRes = await fetch(`${SB_URL}/rest/v1/events?id=eq.${id}&select=id,title,description,date,location,category,host_id,max_participants,created_at`, {
+      const evRes = await fetch(`${SB_URL}/rest/v1/events?id=eq.${id}&select=id,title,description,date,location,category,host_id,max_participants,created_at,is_private`, {
         headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
       });
       const evData = await evRes.json();
@@ -346,7 +346,7 @@ const db = {
       const { data: event, error } = await sb("events", {
         method: "POST",
         token: _session.token,
-        body: { title, description, location, category, date: d.toISOString(), max_participants: maxP, host_id: userId },
+        body: { title, description, location, category, date: d.toISOString(), max_participants: maxP, host_id: userId, is_private: data.is_private || false },
       });
       if (error) return { error };
       return { data: Array.isArray(event) ? event[0] : event };
@@ -356,17 +356,19 @@ const db = {
   async joinEvent(eventId, userId) {
     return wrap(async () => {
       if (!_session?.token) return { error: "Sign in required." };
-
-      // Check capacity
       const ev = await db.getEvent(eventId);
       if (ev && ev.attendee_count >= ev.max_participants) return { error: "This event is full." };
-
-      const { error } = await sb("event_attendees", {
+      const res = await fetch(`${SB_URL}/rest/v1/event_attendees`, {
         method: "POST",
-        token: _session.token,
-        body: { event_id: eventId, user_id: userId },
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
+        body: JSON.stringify({ event_id: eventId, user_id: userId, status: "approved" }),
       });
-      if (error) return { error: error.includes("duplicate") || error.includes("unique") ? "You already joined this event." : error };
+      if (!res.ok) {
+        const err = await res.json();
+        if (JSON.stringify(err).includes("duplicate") || JSON.stringify(err).includes("unique"))
+          return { error: "You already joined this event." };
+        return { error: "Could not join event." };
+      }
       return { data: true };
     }, { error: "Could not join event." });
   },
@@ -390,6 +392,98 @@ const db = {
     }, { error: "Could not leave event." });
   },
 
+  async requestJoin(eventId, userId) {
+    return wrap(async () => {
+      if (!_session?.token) return { error: "Sign in required." };
+      const res = await fetch(`${SB_URL}/rest/v1/event_attendees`, {
+        method: "POST",
+        headers: {
+          "apikey": SB_KEY,
+          "Authorization": `Bearer ${SB_KEY}`,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal",
+        },
+        body: JSON.stringify({ event_id: eventId, user_id: userId, status: "pending" }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        if (JSON.stringify(err).includes("duplicate") || JSON.stringify(err).includes("unique"))
+          return { error: "already_requested" };
+        return { error: "Could not send request." };
+      }
+      return { data: true };
+    }, { error: "Could not send request." });
+  },
+
+  async cancelRequest(eventId, userId) {
+    return wrap(async () => {
+      const res = await fetch(
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}`,
+        { method: "DELETE", headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json" } }
+      );
+      if (!res.ok) return { error: "Could not cancel request." };
+      return { data: true };
+    }, { error: "Could not cancel request." });
+  },
+
+  async getRequestStatus(eventId, userId) {
+    return wrap(async () => {
+      const res = await fetch(
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}&select=status`,
+        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+      );
+      const data = await res.json();
+      return data?.[0]?.status || null;
+    }, null);
+  },
+
+  async getJoinRequests(eventId) {
+    return wrap(async () => {
+      const attRes = await fetch(
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&status=eq.pending&select=user_id`,
+        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+      );
+      const att = await attRes.json();
+      if (!Array.isArray(att) || att.length === 0) return [];
+      const ids = att.map(a => a.user_id).join(",");
+      const usersRes = await fetch(
+        `${SB_URL}/rest/v1/users?id=in.(${ids})&select=id,name,email`,
+        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+      );
+      const users = await usersRes.json();
+      return Array.isArray(users) ? users : [];
+    }, []);
+  },
+
+  async approveRequest(eventId, userId) {
+    return wrap(async () => {
+      const res = await fetch(
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}`,
+        {
+          method: "PATCH",
+          headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "approved" }),
+        }
+      );
+      if (!res.ok) return { error: "Could not approve." };
+      return { data: true };
+    }, { error: "Could not approve." });
+  },
+
+  async rejectRequest(eventId, userId) {
+    return wrap(async () => {
+      const res = await fetch(
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}`,
+        {
+          method: "DELETE",
+          headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
+        }
+      );
+      if (!res.ok) return { error: "Could not reject." };
+      return { data: true };
+    }, { error: "Could not reject." });
+  },
+
   async deleteEvent(eventId) {
     return wrap(async () => {
       if (!_session?.token) return { error: "Sign in required." };
@@ -409,7 +503,7 @@ const db = {
   async getParticipants(eventId) {
     return wrap(async () => {
       const attRes = await fetch(
-        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&select=user_id`,
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&status=eq.approved&select=user_id`,
         { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
       );
       const att = await attRes.json();
@@ -427,14 +521,8 @@ const db = {
   async isJoined(eventId, userId) {
     return wrap(async () => {
       const res = await fetch(
-        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}&select=id`,
-        {
-          headers: {
-            "apikey": SB_KEY,
-            "Authorization": `Bearer ${_session?.token || SB_KEY}`,
-            "Prefer": "count=exact",
-          },
-        }
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}&status=eq.approved&select=id`,
+        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Prefer": "count=exact" } }
       );
       const count = parseInt(res.headers.get("content-range")?.split("/")[1] || "0");
       return count > 0;
@@ -453,10 +541,10 @@ const db = {
 
       const [joinedRaw, createdRaw] = await Promise.all([
         joinedIds.length
-          ? fetch(`${SB_URL}/rest/v1/events?id=in.(${joinedIds.join(",")})&select=id,title,description,date,location,category,host_id,max_participants,created_at&order=created_at.desc`,
+          ? fetch(`${SB_URL}/rest/v1/events?id=in.(${joinedIds.join(",")})&select=id,title,description,date,location,category,host_id,max_participants,created_at,is_private&order=created_at.desc`,
               { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }).then(r => r.json())
           : Promise.resolve([]),
-        fetch(`${SB_URL}/rest/v1/events?host_id=eq.${userId}&select=id,title,description,date,location,category,host_id,max_participants,created_at&order=created_at.desc`,
+        fetch(`${SB_URL}/rest/v1/events?host_id=eq.${userId}&select=id,title,description,date,location,category,host_id,max_participants,created_at,is_private&order=created_at.desc`,
           { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }).then(r => r.json()),
       ]);
 
@@ -476,7 +564,7 @@ const db = {
       let countMap = {};
       if (allIds.length) {
         const cRes = await fetch(
-          `${SB_URL}/rest/v1/event_attendees?select=event_id&event_id=in.(${allIds})`,
+          `${SB_URL}/rest/v1/event_attendees?select=event_id&status=eq.approved&event_id=in.(${allIds})`,
           { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
         );
         const counts = await cRes.json();
@@ -675,6 +763,35 @@ const css = `
   .trend-rank.r2{background:linear-gradient(135deg,#9CA3AF,#D1D5DB);color:#0E0E12}
   .trend-rank.r3{background:linear-gradient(135deg,#B45309,#D97706);color:#fff}
   @media(max-width:768px){.trend-grid{grid-template-columns:1fr}}
+
+  /* PRIVATE TOGGLE */
+  .private-toggle{display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-top:4px;cursor:pointer;transition:all 0.18s}
+  .private-toggle:hover{border-color:rgba(168,85,247,0.3)}
+  .private-toggle.on{border-color:rgba(168,85,247,0.4);background:rgba(168,85,247,0.06)}
+  .toggle-left{display:flex;flex-direction:column;gap:3px}
+  .toggle-label{font-size:13px;font-weight:700;color:var(--text)}
+  .toggle-desc{font-size:11px;color:var(--muted)}
+  .toggle-switch{width:42px;height:24px;border-radius:100px;background:var(--bg4);position:relative;transition:background 0.2s;flex-shrink:0}
+  .toggle-switch.on{background:var(--purple);box-shadow:0 0 12px var(--glow-purple)}
+  .toggle-switch::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.3)}
+  .toggle-switch.on::after{transform:translateX(18px)}
+
+  /* REQUEST PANEL */
+  .req-panel{margin-top:12px;background:var(--bg3);border-radius:16px;overflow:hidden;border:1px solid rgba(168,85,247,0.2)}
+  .req-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:pointer;transition:background 0.16s}
+  .req-header:hover{background:var(--bg4)}
+  .req-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
+  .req-num{background:rgba(168,85,247,0.15);color:var(--purple);padding:3px 9px;border-radius:100px;font-size:12px;font-weight:800}
+  .req-list{padding:0 18px 14px;display:flex;flex-direction:column;gap:8px}
+  .req-item{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg2);border-radius:12px;border:1px solid var(--border)}
+  .req-actions{display:flex;gap:6px;flex-shrink:0}
+  .req-approve{background:rgba(163,230,53,0.12);color:var(--lime);border:1px solid rgba(163,230,53,0.25);padding:5px 12px;border-radius:100px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.16s}
+  .req-approve:hover{background:rgba(163,230,53,0.22)}
+  .req-reject{background:rgba(244,114,182,0.1);color:var(--pink);border:1px solid rgba(244,114,182,0.2);padding:5px 12px;border-radius:100px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.16s}
+  .req-reject:hover{background:rgba(244,114,182,0.2)}
+
+  /* PRIVATE BADGE ON CARD */
+  .badge-private{background:rgba(168,85,247,0.15);color:var(--purple);border:1px solid rgba(168,85,247,0.3);padding:2px 8px;border-radius:100px;font-size:9px;font-weight:800;letter-spacing:0.06em}
 
   /* PROFILE HEADER */
   .profile-header{background:var(--bg2);border:1px solid var(--border);border-radius:24px;padding:24px;margin-bottom:24px;display:flex;align-items:center;gap:20px;position:relative;overflow:hidden}
@@ -898,6 +1015,7 @@ function ECard({ event, user, onSelect, onAction }) {
         <div className="ecard-head">
           <CTag cat={event.category} />
           <div style={{ display:"flex", gap:5, alignItems:"center" }}>
+            {event.is_private && <span className="badge-private">🔒 PRIVATE</span>}
             {isNew && <span className="badge-new">NEW</span>}
             {canDelete && (
               <button className="btn bsm" onClick={handleDelete}
@@ -1098,20 +1216,28 @@ function HomePage({ user, onSelect, onRefresh, onShowAuth }) {
 
 // ─── Detail Page ──────────────────────────────────────────────────────────────
 function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
-  const [event,        setEvent]       = useState(null);
-  const [joined,       setJoined]      = useState(false);
-  const [loading,      setLoading]     = useState(true);
-  const [acting,       setActing]      = useState(false);
-  const [deleting,     setDeleting]    = useState(false);
-  const [showParts,    setShowParts]   = useState(false);
+  const [event,        setEvent]        = useState(null);
+  const [joined,       setJoined]       = useState(false);
+  const [reqStatus,    setReqStatus]    = useState(null); // null | pending | approved | rejected
+  const [loading,      setLoading]      = useState(true);
+  const [acting,       setActing]       = useState(false);
+  const [deleting,     setDeleting]     = useState(false);
+  const [showParts,    setShowParts]    = useState(false);
   const [participants, setParticipants] = useState([]);
   const [partsLoading, setPartsLoading] = useState(false);
+  const [showReqs,     setShowReqs]     = useState(false);
+  const [requests,     setRequests]     = useState([]);
+  const [reqsLoading,  setReqsLoading]  = useState(false);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [ev, j] = await Promise.all([db.getEvent(eventId), user ? db.isJoined(eventId, user.id) : Promise.resolve(false)]);
-      setEvent(ev); setJoined(j); setLoading(false);
+      const [ev, j, rs] = await Promise.all([
+        db.getEvent(eventId),
+        user ? db.isJoined(eventId, user.id) : Promise.resolve(false),
+        user ? db.getRequestStatus(eventId, user.id) : Promise.resolve(null),
+      ]);
+      setEvent(ev); setJoined(j); setReqStatus(rs); setLoading(false);
     })();
   }, [eventId, user]);
 
@@ -1122,8 +1248,40 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
   const pct      = capPct(event.attendee_count, event.max_participants);
   const isHost   = user && event.host_id === user.id;
   const isAdmin  = user && user.email === ADMIN_EMAIL;
-  const canDelete        = isHost || isAdmin;
+  const canDelete           = isHost || isAdmin;
   const canViewParticipants = isHost || isAdmin;
+
+  const loadRequests = async () => {
+    if (showReqs) { setShowReqs(false); return; }
+    setReqsLoading(true); setShowReqs(true);
+    const data = await db.getJoinRequests(event.id);
+    setRequests(data); setReqsLoading(false);
+  };
+
+  const handleApprove = async (userId) => {
+    await db.approveRequest(event.id, userId);
+    setRequests(r => r.filter(u => u.id !== userId));
+    setEvent(ev => ({ ...ev, attendee_count: ev.attendee_count + 1 }));
+  };
+
+  const handleReject = async (userId) => {
+    await db.rejectRequest(event.id, userId);
+    setRequests(r => r.filter(u => u.id !== userId));
+  };
+
+  const handleRequest = async () => {
+    if (!user) { onShowAuth(); return; }
+    setActing(true);
+    if (reqStatus === "pending") {
+      await db.cancelRequest(event.id, user.id);
+      setReqStatus(null);
+    } else {
+      const r = await db.requestJoin(event.id, user.id);
+      if (r.error === "already_requested") setReqStatus("pending");
+      else if (!r.error) setReqStatus("pending");
+    }
+    setActing(false);
+  };
 
   const loadParticipants = async () => {
     if (showParts) { setShowParts(false); return; }
@@ -1185,13 +1343,57 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
           </div>
           <CBar count={event.attendee_count} max={event.max_participants} />
           <div style={{ marginTop:22, display:"flex", gap:10, flexWrap:"wrap" }}>
-            {full && !joined
-              ? <button className="btn bf blg" disabled>Event Full</button>
-              : <button className={`btn blg ${joined?"bd":"bp"}`} onClick={toggle} disabled={acting}>{acting ? "…" : joined ? "Leave Event" : "✦ Join Event"}</button>
-            }
+            {event.is_private && !joined ? (
+              reqStatus === "approved"
+                ? <button className={`btn blg bd`} onClick={toggle} disabled={acting}>{acting ? "…" : "Leave Event"}</button>
+                : reqStatus === "pending"
+                ? <button className="btn blg" onClick={handleRequest} disabled={acting} style={{ background:"rgba(168,85,247,0.12)", color:"var(--purple)", border:"1px solid rgba(168,85,247,0.3)" }}>{acting ? "…" : "⏳ Pending · Cancel"}</button>
+                : full
+                ? <button className="btn bf blg" disabled>Event Full</button>
+                : <button className="btn blg" onClick={handleRequest} disabled={acting} style={{ background:"rgba(168,85,247,0.12)", color:"var(--purple)", border:"1px solid rgba(168,85,247,0.3)" }}>{acting ? "…" : "🔒 Request to Join"}</button>
+            ) : (
+              full && !joined
+                ? <button className="btn bf blg" disabled>Event Full</button>
+                : <button className={`btn blg ${joined?"bd":"bp"}`} onClick={toggle} disabled={acting}>{acting ? "…" : joined ? "Leave Event" : "✦ Join Event"}</button>
+            )}
             <button className="btn bg blg" onClick={() => { shareEvent(event.id, event.title); onRefresh("ok", "Link copied! 🔗"); }}>🔗 Share</button>
             <button className="btn bg blg" onClick={onBack}>← Back</button>
           </div>
+
+          {canViewParticipants && event.is_private && (
+            <div className="req-panel">
+              <div className="req-header" onClick={loadRequests}>
+                <div className="req-title">
+                  📬 Join Requests
+                  <span className="req-num">{requests.length > 0 && showReqs ? requests.length : "?"}</span>
+                </div>
+                <span style={{ color:"var(--muted)", fontSize:13 }}>{showReqs ? "▲ Hide" : "▼ Show"}</span>
+              </div>
+              {showReqs && (
+                <div className="req-list">
+                  {reqsLoading ? (
+                    <div style={{ textAlign:"center", padding:"16px 0", color:"var(--muted)", fontSize:13 }}>Loading…</div>
+                  ) : requests.length === 0 ? (
+                    <div style={{ textAlign:"center", padding:"16px 0", color:"var(--muted)", fontSize:13 }}>No pending requests.</div>
+                  ) : (
+                    requests.map(p => (
+                      <div key={p.id} className="req-item">
+                        <div className="part-avatar">{p.name?.[0]?.toUpperCase() || "?"}</div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div className="part-name">{p.name}</div>
+                          <div className="part-email">{p.email}</div>
+                        </div>
+                        <div className="req-actions">
+                          <button className="req-approve" onClick={() => handleApprove(p.id)}>✓ Approve</button>
+                          <button className="req-reject" onClick={() => handleReject(p.id)}>✗ Reject</button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {canViewParticipants && (
             <div className="part-panel">
@@ -1232,7 +1434,7 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
 
 // ─── Create Page ──────────────────────────────────────────────────────────────
 function CreatePage({ user, onBack, onShowAuth, onCreated }) {
-  const [form, setForm]       = useState({ title:"", description:"", category:"Social", date:"", location:"", max_participants:50 });
+  const [form, setForm]       = useState({ title:"", description:"", category:"Social", date:"", location:"", max_participants:50, is_private:false });
   const [error, setError]     = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -1268,6 +1470,16 @@ function CreatePage({ user, onBack, onShowAuth, onCreated }) {
           <div className="fg"><label className="fl">Date & Time * <span style={{ color:"var(--muted)", fontWeight:400, fontSize:10 }}>(today → Dec 2030)</span></label><input className="fi" type="datetime-local" min={todayMin()} max={DATE_MAX} value={form.date} onChange={e => set("date", e.target.value)} /></div>
           <div className="fg"><label className="fl">Location *</label><input className="fi" placeholder="e.g. Main Hall, Room 101" value={form.location} onChange={e => set("location", e.target.value)} maxLength={300} /></div>
           <div className="s2 fg"><label className="fl">Description *</label><textarea className="fi" rows={5} placeholder="Describe what attendees can expect…" value={form.description} onChange={e => set("description", e.target.value)} maxLength={2000} style={{ resize:"vertical" }} /></div>
+          <div className="s2 fg">
+            <label className="fl">Event Visibility</label>
+            <div className={`private-toggle ${form.is_private?"on":""}`} onClick={() => set("is_private", !form.is_private)}>
+              <div className="toggle-left">
+                <span className="toggle-label">🔒 Private Event — Require Approval</span>
+                <span className="toggle-desc">{form.is_private ? "Students must request to join. You approve or reject." : "Anyone can join instantly. Toggle to require approval."}</span>
+              </div>
+              <div className={`toggle-switch ${form.is_private?"on":""}`} />
+            </div>
+          </div>
         </div>
         {error && <div className="ferr">{error}</div>}
         <div style={{ display:"flex", gap:9, marginTop:20 }}>
