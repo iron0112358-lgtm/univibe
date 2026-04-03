@@ -969,25 +969,67 @@ function JoinBtn({ event, user, onAction }) {
 }
 
 function JoinBtnFull({ event, user, onAction }) {
-  const [joined,  setJoined]  = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [joined,    setJoined]    = useState(false);
+  const [reqStatus, setReqStatus] = useState(null);
+  const [loading,   setLoading]   = useState(false);
+
   useEffect(() => {
-    if (!user) { setJoined(false); return; }
-    db.isJoined(event.id, user.id).then(setJoined);
-  }, [event.id, user]);
+    if (!user) { setJoined(false); setReqStatus(null); return; }
+    if (event.is_private) {
+      db.getRequestStatus(event.id, user.id).then(s => {
+        setReqStatus(s);
+        setJoined(s === "approved");
+      });
+    } else {
+      db.isJoined(event.id, user.id).then(setJoined);
+    }
+  }, [event.id, event.is_private, user]);
+
   const full = event.attendee_count >= event.max_participants;
+  const base = { width:"100%", justifyContent:"center", borderRadius:14, padding:"10px 0", fontSize:13, fontWeight:700, letterSpacing:"0.02em" };
+  const privBase = { ...base, background:"rgba(168,85,247,0.12)", color:"var(--purple)", border:"1px solid rgba(168,85,247,0.3)" };
+
   const click = async e => {
     e.stopPropagation();
     if (!user) { onAction("auth"); return; }
     setLoading(true);
-    const r = joined ? await db.leaveEvent(event.id, user.id) : await db.joinEvent(event.id, user.id);
+
+    if (event.is_private) {
+      if (joined) {
+        // Leave approved event
+        const r = await db.leaveEvent(event.id, user.id);
+        if (!r.error) { setJoined(false); setReqStatus(null); onAction("left"); }
+        else onAction("error:" + r.error);
+      } else if (reqStatus === "pending") {
+        // Cancel pending request
+        await db.cancelRequest(event.id, user.id);
+        setReqStatus(null);
+      } else {
+        // Send request
+        const r = await db.requestJoin(event.id, user.id);
+        if (!r.error || r.error === "already_requested") setReqStatus("pending");
+        else onAction("error:" + r.error);
+      }
+    } else {
+      const r = joined ? await db.leaveEvent(event.id, user.id) : await db.joinEvent(event.id, user.id);
+      if (r.error) { onAction("error:" + r.error); setLoading(false); return; }
+      setJoined(!joined);
+      onAction(joined ? "left" : "joined");
+    }
     setLoading(false);
-    if (r.error) { onAction("error:" + r.error); return; }
-    setJoined(!joined);
-    onAction(joined ? "left" : "joined");
   };
-  const base = { width:"100%", justifyContent:"center", borderRadius:14, padding:"10px 0", fontSize:13, fontWeight:700, letterSpacing:"0.02em" };
-  if (loading)         return <button className="btn bf" style={base} disabled>…</button>;
+
+  if (loading) return <button className="btn bf" style={base} disabled>…</button>;
+
+  // Private event states
+  if (event.is_private) {
+    if (joined)              return <button className="btn bd" style={base} onClick={click}>✓ Going · Leave</button>;
+    if (reqStatus === "pending") return <button style={privBase} onClick={click}>⏳ Pending · Cancel</button>;
+    if (full)                return <button className="btn bf" style={base} disabled>Event Full</button>;
+    return                          <button style={privBase} onClick={click}>🔒 Request to Join</button>;
+  }
+
+  // Public event states
   if (full && !joined) return <button className="btn bf" style={base} disabled>Event Full</button>;
   if (joined)          return <button className="btn bd" style={base} onClick={click}>✓ Going · Leave</button>;
   return                      <button className="btn bp" style={base} onClick={click}>✦ Join Event</button>;
