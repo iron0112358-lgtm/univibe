@@ -680,13 +680,13 @@ const css = `
   .hero-split{display:grid;grid-template-columns:1fr 1fr;min-height:320px;border-bottom:1px solid var(--border);margin-bottom:36px}
   .hero-left{display:flex;align-items:center;justify-content:center;padding:48px 32px;position:relative;overflow:hidden}
   .hero-left::before{content:'';position:absolute;inset:0;background:none;pointer-events:none}
-  .hero-logo{height:540px;width:auto;max-width:95%;object-fit:contain;position:relative;z-index:1}
-  .hero-right{display:flex;flex-direction:column;justify-content:center;padding:48px 40px}
+  .hero-logo{height:480px;width:100%;max-width:100%;object-fit:contain;position:relative;z-index:1}
+  .hero-right{display:flex;flex-direction:column;justify-content:center;padding:48px 40px 48px 44px}
   .hero-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);padding:6px 16px;border-radius:100px;font-size:12px;color:var(--purple);font-weight:600;margin-bottom:20px;width:fit-content;letter-spacing:0.02em}
   .hero h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(28px,4vw,52px);font-weight:800;line-height:1.05;letter-spacing:-2px;margin-bottom:14px;text-align:left}
   .hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--purple),var(--pink),var(--orange));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
   .hero p{font-size:15px;color:var(--muted2);margin:0 0 24px;line-height:1.65;font-weight:400;max-width:380px}
-  .hero-btns{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:28px}
+  .hero-btns{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:28px;padding:0;align-items:flex-start}
 
   /* STATS */
   .stats{display:flex;gap:8px;flex-wrap:nowrap;margin:0;overflow:visible}
@@ -923,9 +923,9 @@ const css = `
     .stats{gap:8px}.scard{padding:10px 14px}
     .ccard{padding:20px 16px}.dcard-body{padding:18px 16px}
     .hero-split{grid-template-columns:1fr}
-    .hero-left{border-right:none;border-bottom:none;padding:24px 24px}
-    .hero-logo{height:160px}
-    .hero-right{padding:28px 24px}
+    .hero-left{border-right:none;border-bottom:none;padding:20px 16px}
+    .hero-logo{height:320px;max-width:85%}
+    .hero-right{padding:20px 24px}
     .hero h1{letter-spacing:-1px}
   }
   @media(max-width:480px){
