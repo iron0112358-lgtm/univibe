@@ -680,7 +680,7 @@ const css = `
   .hero-split{display:grid;grid-template-columns:1fr 1fr;min-height:320px;border-bottom:1px solid var(--border);margin-bottom:36px}
   .hero-left{display:flex;align-items:center;justify-content:center;padding:48px 32px;border-right:1px solid var(--border);position:relative;overflow:hidden}
   .hero-left::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 80% at 50% 50%,rgba(168,85,247,0.08),transparent);pointer-events:none}
-  .hero-logo{height:220px;width:auto;object-fit:contain;position:relative;z-index:1;filter:drop-shadow(0 0 40px rgba(168,85,247,0.3))}
+  .hero-logo{height:360px;width:auto;max-width:90%;object-fit:contain;position:relative;z-index:1;filter:drop-shadow(0 0 60px rgba(168,85,247,0.25))}
   .hero-right{display:flex;flex-direction:column;justify-content:center;padding:48px 40px}
   .hero-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);padding:6px 16px;border-radius:100px;font-size:12px;color:var(--purple);font-weight:600;margin-bottom:20px;width:fit-content;letter-spacing:0.02em}
   .hero h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(28px,4vw,52px);font-weight:800;line-height:1.05;letter-spacing:-2px;margin-bottom:14px;text-align:left}
