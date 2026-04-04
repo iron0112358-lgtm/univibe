@@ -643,13 +643,12 @@ const css = `
   .container{max-width:1200px;margin:0 auto;padding:0 20px;width:100%}
 
   /* NAV */
-  .nav{position:sticky;top:0;z-index:100;background:rgba(14,14,18,0.85);backdrop-filter:blur(24px);border-bottom:1px solid var(--border)}
-  .nav-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:64px;padding:0 20px}
-  .logo{display:flex;align-items:center;gap:10px;cursor:pointer}
-  .logo-mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--purple),var(--pink));display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:16px;color:#fff;box-shadow:0 0 20px var(--glow-purple);flex-shrink:0}
-  .logo-text{font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:22px;letter-spacing:-0.5px}
-  .logo-text span{background:linear-gradient(135deg,var(--purple),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-  .nav-links{display:flex;align-items:center;gap:2px}
+  .nav{position:sticky;top:0;z-index:100;background:rgba(14,14,18,0.92);backdrop-filter:blur(24px);border-bottom:1px solid var(--border)}
+  .nav-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:center;height:56px;padding:0 20px;gap:4px}
+  .logo{display:none}
+  .logo-mark{display:none}
+  .logo-text{display:none}
+  .nav-links{display:flex;align-items:center;gap:4px;justify-content:center;flex:1}
   .nb{background:none;border:none;cursor:pointer;color:var(--muted2);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;padding:7px 14px;border-radius:10px;transition:all 0.18s}
   .nb:hover,.nb.on{color:var(--text);background:var(--bg3)}
   .nb.cta{background:var(--lime);color:#0E0E12;font-weight:700;border-radius:100px;padding:7px 18px}
@@ -676,14 +675,27 @@ const css = `
   .hero p{font-size:16px;color:var(--muted2);max-width:420px;margin:0 auto 28px;line-height:1.65;font-weight:400}
   .hero-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 
+  /* SPLIT HERO */
+  .hero{padding:0;text-align:left}
+  .hero-split{display:grid;grid-template-columns:1fr 1fr;min-height:320px;border-bottom:1px solid var(--border);margin-bottom:36px}
+  .hero-left{display:flex;align-items:center;justify-content:center;padding:48px 32px;border-right:1px solid var(--border);position:relative;overflow:hidden}
+  .hero-left::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 80% at 50% 50%,rgba(168,85,247,0.08),transparent);pointer-events:none}
+  .hero-logo{height:220px;width:auto;object-fit:contain;position:relative;z-index:1;filter:drop-shadow(0 0 40px rgba(168,85,247,0.3))}
+  .hero-right{display:flex;flex-direction:column;justify-content:center;padding:48px 40px}
+  .hero-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);padding:6px 16px;border-radius:100px;font-size:12px;color:var(--purple);font-weight:600;margin-bottom:20px;width:fit-content;letter-spacing:0.02em}
+  .hero h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(28px,4vw,52px);font-weight:800;line-height:1.05;letter-spacing:-2px;margin-bottom:14px;text-align:left}
+  .hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--purple),var(--pink),var(--orange));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  .hero p{font-size:15px;color:var(--muted2);margin:0 0 24px;line-height:1.65;font-weight:400;max-width:380px}
+  .hero-btns{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:28px}
+
   /* STATS */
-  .stats{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:32px 0}
-  .scard{background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:18px 28px;text-align:center;transition:all 0.2s;position:relative;overflow:hidden}
+  .stats{display:flex;gap:10px;flex-wrap:wrap;margin:0}
+  .scard{background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:12px 18px;text-align:center;transition:all 0.2s;position:relative;overflow:hidden}
   .scard::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(168,85,247,0.03),transparent);opacity:0;transition:opacity 0.2s}
   .scard:hover{transform:translateY(-3px);border-color:rgba(168,85,247,0.2);box-shadow:0 8px 32px rgba(0,0,0,0.3)}
   .scard:hover::before{opacity:1}
-  .snum{font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:800;background:linear-gradient(135deg,var(--purple),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-  .slbl{font-size:11px;color:var(--muted);margin-top:4px;font-weight:500;text-transform:uppercase;letter-spacing:0.08em}
+  .snum{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:800;background:linear-gradient(135deg,var(--purple),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  .slbl{font-size:10px;color:var(--muted);margin-top:3px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em}
 
   /* FILTERS */
   .filters{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:20px}
@@ -904,19 +916,25 @@ const css = `
   @keyframes spin{to{transform:rotate(360deg)}}
 
   @media(max-width:768px){
-    .nav-links{display:none}.ham{display:flex}
+    .nav-links{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}.ham{display:none}
     .grid{grid-template-columns:1fr}
     .dgrid{grid-template-columns:1fr}
     .f2{grid-template-columns:1fr}.s2{grid-column:span 1}
-    .stats{gap:10px}.scard{padding:14px 18px}
+    .stats{gap:8px}.scard{padding:10px 14px}
     .ccard{padding:20px 16px}.dcard-body{padding:18px 16px}
+    .hero-split{grid-template-columns:1fr}
+    .hero-left{border-right:none;border-bottom:1px solid var(--border);padding:32px 24px}
+    .hero-logo{height:160px}
+    .hero-right{padding:28px 24px}
     .hero h1{letter-spacing:-1px}
   }
   @media(max-width:480px){
-    .hero h1{font-size:30px}
+    .hero h1{font-size:28px}
     .blg{padding:12px 22px;font-size:14px}
     .toast{left:16px;right:16px;bottom:16px;transform:none;border-radius:16px;white-space:normal}
     @keyframes tin{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+    .nav-inner{height:auto;padding:10px 16px;flex-wrap:wrap;gap:6px}
+    .nb{font-size:11px;padding:5px 10px}
   }
 `;
 
@@ -1216,19 +1234,32 @@ function HomePage({ user, onSelect, onRefresh, onShowAuth }) {
   return (
     <div className="page"><div className="container">
       <div className="hero">
-        <div className="hero-badge">🎓 UniVibe · Your campus social</div>
-        <h1>Where campus<br /><em>comes alive</em></h1>
-        <p>Discover events, meet people, and make university actually worth it.</p>
-        <div className="hero-btns">
-          <button className="btn bp blg" onClick={() => user ? onSelect("create") : onShowAuth()}>✦ Host an Event</button>
-          <button className="btn bo blg" onClick={() => document.getElementById("feed")?.scrollIntoView({ behavior:"smooth" })}>Explore Events ↓</button>
+        <div className="hero-split">
+          {/* LEFT — Big Logo */}
+          <div className="hero-left">
+            <img
+              src="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png"
+              alt="UniVibe"
+              className="hero-logo"
+            />
+          </div>
+          {/* RIGHT — Text + Stats */}
+          <div className="hero-right">
+            <div className="hero-badge">🎓 UniVibe · Your campus social</div>
+            <h1>Where campus<br /><em>comes alive</em></h1>
+            <p>Discover events, meet people, and make university actually worth it.</p>
+            <div className="hero-btns">
+              <button className="btn bp blg" onClick={() => user ? onSelect("create") : onShowAuth()}>✦ Host an Event</button>
+              <button className="btn bo blg" onClick={() => document.getElementById("feed")?.scrollIntoView({ behavior:"smooth" })}>Explore Events ↓</button>
+            </div>
+            <div className="stats">
+              <div className="scard"><div className="snum">{stats.totalEvents}</div><div className="slbl">Events</div></div>
+              <div className="scard"><div className="snum">{stats.totalJoins}</div><div className="slbl">RSVPs</div></div>
+              <div className="scard"><div className="snum">{VALID_CATS.length}</div><div className="slbl">Categories</div></div>
+              <div className="scard"><div className="snum">{CAT_ICON[stats.topCategory] || "—"}</div><div className="slbl">{stats.topCategory !== "—" ? stats.topCategory : "No events yet"}</div></div>
+            </div>
+          </div>
         </div>
-      </div>
-      <div className="stats">
-        <div className="scard"><div className="snum">{stats.totalEvents}</div><div className="slbl">Events</div></div>
-        <div className="scard"><div className="snum">{stats.totalJoins}</div><div className="slbl">RSVPs</div></div>
-        <div className="scard"><div className="snum">{VALID_CATS.length}</div><div className="slbl">Categories</div></div>
-        <div className="scard"><div className="snum">{CAT_ICON[stats.topCategory] || "—"}</div><div className="slbl">{stats.topCategory !== "—" ? stats.topCategory : "No events yet"}</div></div>
       </div>
       <TrendingSection user={user} onSelect={onSelect} onShowAuth={onShowAuth} onRefresh={onRefresh} />
       <div id="feed">
@@ -1649,10 +1680,9 @@ export default function App() {
         <style>{css}</style>
         <nav className="nav">
           <div className="nav-inner">
-            <div className="logo" onClick={() => nav("home")}><img src="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png" alt="UniVibe" style={{ height:156, width:"auto", display:"block" }} /></div>
             <div className="nav-links">
               <button className={`nb ${page==="home"?"on":""}`} onClick={() => nav("home")}>Events</button>
-              <button className={`nb ${page==="my"?"on":""}`}   onClick={() => nav("my")}>My Events</button>
+              <button className={`nb ${page==="my"?"on":""}`} onClick={() => nav("my")}>My Events</button>
               <button className={`nb ${page==="create"?"on":""}`} onClick={() => nav("create")}>Host Event</button>
               {user ? (
                 <><div className="avatar" title={user.name} onClick={() => nav("my")}>{user.name[0].toUpperCase()}</div>
@@ -1661,16 +1691,6 @@ export default function App() {
                 <button className="nb cta" onClick={() => setShowAuth(true)}>Sign In</button>
               )}
             </div>
-            <div className="ham" onClick={() => setMobileOpen(o => !o)}><span /><span /><span /></div>
-          </div>
-          <div className={`mmenu ${mobileOpen?"open":""}`}>
-            <button className="nb" onClick={() => nav("home")}>Events</button>
-            <button className="nb" onClick={() => nav("my")}>My Events</button>
-            <button className="nb" onClick={() => nav("create")}>Host Event</button>
-            {user
-              ? <button className="nb" onClick={() => { db.signOut(); setUser(null); nav("home"); showToast("ok","Signed out."); }}>Sign Out ({user.name})</button>
-              : <button className="nb" onClick={() => { setShowAuth(true); setMobileOpen(false); }}>Sign In</button>
-            }
           </div>
         </nav>
         <ErrorBoundary>
