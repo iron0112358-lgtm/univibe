@@ -678,9 +678,9 @@ const css = `
   /* SPLIT HERO */
   .hero{padding:0;text-align:left}
   .hero-split{display:grid;grid-template-columns:1fr 1fr;min-height:320px;border-bottom:1px solid var(--border);margin-bottom:36px}
-  .hero-left{display:flex;align-items:center;justify-content:center;padding:48px 32px;border-right:1px solid var(--border);position:relative;overflow:hidden}
-  .hero-left::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 80% at 50% 50%,rgba(168,85,247,0.08),transparent);pointer-events:none}
-  .hero-logo{height:360px;width:auto;max-width:90%;object-fit:contain;position:relative;z-index:1;filter:drop-shadow(0 0 60px rgba(168,85,247,0.25))}
+  .hero-left{display:flex;align-items:center;justify-content:center;padding:48px 32px;position:relative;overflow:hidden}
+  .hero-left::before{content:'';position:absolute;inset:0;background:none;pointer-events:none}
+  .hero-logo{height:540px;width:auto;max-width:95%;object-fit:contain;position:relative;z-index:1}
   .hero-right{display:flex;flex-direction:column;justify-content:center;padding:48px 40px}
   .hero-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);padding:6px 16px;border-radius:100px;font-size:12px;color:var(--purple);font-weight:600;margin-bottom:20px;width:fit-content;letter-spacing:0.02em}
   .hero h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(28px,4vw,52px);font-weight:800;line-height:1.05;letter-spacing:-2px;margin-bottom:14px;text-align:left}
@@ -689,8 +689,8 @@ const css = `
   .hero-btns{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:28px}
 
   /* STATS */
-  .stats{display:flex;gap:10px;flex-wrap:wrap;margin:0}
-  .scard{background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:12px 18px;text-align:center;transition:all 0.2s;position:relative;overflow:hidden}
+  .stats{display:flex;gap:8px;flex-wrap:nowrap;margin:0;overflow:visible}
+  .scard{background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:10px 12px;text-align:center;transition:all 0.2s;position:relative;overflow:hidden;flex:1;min-width:0}
   .scard::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(168,85,247,0.03),transparent);opacity:0;transition:opacity 0.2s}
   .scard:hover{transform:translateY(-3px);border-color:rgba(168,85,247,0.2);box-shadow:0 8px 32px rgba(0,0,0,0.3)}
   .scard:hover::before{opacity:1}
@@ -923,7 +923,7 @@ const css = `
     .stats{gap:8px}.scard{padding:10px 14px}
     .ccard{padding:20px 16px}.dcard-body{padding:18px 16px}
     .hero-split{grid-template-columns:1fr}
-    .hero-left{border-right:none;border-bottom:1px solid var(--border);padding:32px 24px}
+    .hero-left{border-right:none;border-bottom:none;padding:24px 24px}
     .hero-logo{height:160px}
     .hero-right{padding:28px 24px}
     .hero h1{letter-spacing:-1px}
