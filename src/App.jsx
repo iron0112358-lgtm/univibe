@@ -88,43 +88,51 @@ const capPct  = (n, m) => Math.min(100, m > 0 ? Math.round((n / m) * 100) : 0);
 const trunc   = (s, n = 120) => String(s || "").trim().slice(0, n);
 const wrap    = async (fn, fallback) => { try { return await fn(); } catch (e) { console.error(e); return fallback; } };
 
+// ─── Name Extractor ──────────────────────────────────────────────────────────
+function nameFromEmail(email) {
+  try {
+    const local = email.split("@")[0]; // chichinadze.saba2
+    const parts = local.split(".");    // ["chichinadze", "saba2"]
+    return parts
+      .map(p => p.replace(/[0-9]/g, ""))          // remove numbers
+      .filter(p => p.length > 0)                   // remove empty parts
+      .map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()) // capitalize
+      .join(" ");                                   // "Chichinadze Saba"
+  } catch { return email.split("@")[0]; }
+}
+
 // ─── DB Layer ─────────────────────────────────────────────────────────────────
 const db = {
 
-  async signUp(name, email, password) {
+  async signUp(email, password) {
     return wrap(async () => {
-      name  = String(name  || "").trim().slice(0, 100);
       email = String(email || "").trim().toLowerCase();
-      if (!name)  return { error: "Name is required." };
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email." };
       if (!email.endsWith("@kiu.edu.ge")) return { error: "Only KIU university emails (@kiu.edu.ge) are allowed." };
       if (String(password || "").length < 6) return { error: "Password must be 6+ characters." };
 
+      const name = nameFromEmail(email);
+
       const { data: auth, error: authErr } = await sbAuth("signup", { email, password });
       if (authErr) return { error: authErr };
 
-      const token = auth.access_token;
-      const userId = auth.user.id;
+      // Email confirmation required — don't create session yet
+      // Save profile in users table for when they confirm
+      const userId = auth.user?.id;
+      if (userId) {
+        await fetch(`${SB_URL}/rest/v1/users`, {
+          method: "POST",
+          headers: {
+            "apikey": SB_KEY,
+            "Authorization": `Bearer ${SB_KEY}`,
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+          },
+          body: JSON.stringify({ id: userId, name, email }),
+        });
+      }
 
-      // Save profile using anon key (RLS disabled)
-      await fetch(`${SB_URL}/rest/v1/users`, {
-        method: "POST",
-        headers: {
-          "apikey": SB_KEY,
-          "Authorization": `Bearer ${SB_KEY}`,
-          "Content-Type": "application/json",
-          "Prefer": "return=minimal",
-        },
-        body: JSON.stringify({ id: userId, name, email }),
-      });
-
-      _session = {
-        id: userId, email, name, token,
-        refresh_token: auth.refresh_token,
-        expires_at: Math.floor(Date.now() / 1000) + (auth.expires_in || 3600),
-      };
-      saveSession(_session);
-      return { data: _session };
+      return { data: "verify" }; // signal to show verify message
     }, { error: "Sign up failed. Please try again." });
   },
 
@@ -1186,17 +1194,21 @@ function ECard({ event, user, onSelect, onAction }) {
 
 // ─── Auth Modal ───────────────────────────────────────────────────────────────
 function AuthModal({ onClose, onAuth }) {
-  const [mode, setMode]       = useState("login");
-  const [form, setForm]       = useState({ name:"", email:"", password:"" });
-  const [error, setError]     = useState("");
-  const [loading, setLoading] = useState(false);
+  const [mode,     setMode]    = useState("login");
+  const [form,     setForm]    = useState({ email:"", password:"" });
+  const [error,    setError]   = useState("");
+  const [loading,  setLoading] = useState(false);
+  const [verified, setVerified] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const go  = async () => {
     setError(""); setLoading(true);
-    const r = mode === "login" ? await db.signIn(form.email, form.password) : await db.signUp(form.name, form.email, form.password);
+    const r = mode === "login"
+      ? await db.signIn(form.email, form.password)
+      : await db.signUp(form.email, form.password);
     setLoading(false);
-    if (r.error) setError(r.error);
-    else { onAuth(r.data); onClose(); }
+    if (r.error) { setError(r.error); return; }
+    if (r.data === "verify") { setVerified(true); return; }
+    onAuth(r.data); onClose();
   };
   return (
     <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -1205,15 +1217,29 @@ function AuthModal({ onClose, onAuth }) {
           <div style={{ display:"flex", alignItems:"center", justifyContent:"center", marginBottom:12 }}>
             <img src="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png" alt="UniVibe" style={{ height:200, width:"auto" }} />
           </div>
-          <h2>{mode === "login" ? "Welcome back" : "Join UniVibe"}</h2>
-          <p>{mode === "login" ? "Sign in to join and create events" : "Start discovering campus life"}</p>
+          {!verified && <h2>{mode === "login" ? "Welcome back" : "Join UniVibe"}</h2>}
+          {!verified && <p>{mode === "login" ? "Sign in to join and create events" : "Start discovering campus life"}</p>}
         </div>
-        {mode === "signup" && <div className="fg"><label className="fl">Full Name</label><input className="fi" placeholder="Your name" value={form.name} onChange={e => set("name", e.target.value)} maxLength={100} /></div>}
-        <div className="fg"><label className="fl">Email</label><input className="fi" type="email" placeholder="you@kiu.edu.ge" value={form.email} onChange={e => set("email", e.target.value)} maxLength={200} /></div>
-        <div className="fg"><label className="fl">Password</label><input className="fi" type="password" placeholder="••••••••" value={form.password} onChange={e => set("password", e.target.value)} onKeyDown={e => e.key === "Enter" && !loading && go()} maxLength={200} /></div>
-        {error && <div className="ferr">{error}</div>}
-        <button className="btn bp" style={{ width:"100%", justifyContent:"center", marginTop:18, borderRadius:14, padding:"13px 0", fontSize:15 }} onClick={go} disabled={loading}>{loading ? "Please wait…" : mode === "login" ? "Sign In →" : "Create Account →"}</button>
-        <div className="fsw">{mode === "login" ? <>No account? <button onClick={() => { setMode("signup"); setError(""); }}>Sign up free</button></> : <>Have an account? <button onClick={() => { setMode("login"); setError(""); }}>Sign in</button></>}</div>
+        {verified ? (
+          <div style={{ textAlign:"center", padding:"12px 0 20px" }}>
+            <div style={{ fontSize:48, marginBottom:16 }}>📬</div>
+            <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:800, fontSize:18, marginBottom:10 }}>Check your KIU email!</div>
+            <div style={{ color:"var(--muted2)", fontSize:13, lineHeight:1.7, marginBottom:20 }}>
+              We sent a confirmation link to<br />
+              <strong style={{ color:"var(--purple)" }}>{form.email}</strong><br />
+              Click it to activate your UniVibe account.
+            </div>
+            <button className="btn bp" style={{ width:"100%", justifyContent:"center", borderRadius:14, padding:"13px 0", fontSize:15 }} onClick={onClose}>Got it ✓</button>
+          </div>
+        ) : (
+          <>
+            <div className="fg"><label className="fl">KIU Email</label><input className="fi" type="email" placeholder="you@kiu.edu.ge" value={form.email} onChange={e => set("email", e.target.value)} maxLength={200} /></div>
+            <div className="fg"><label className="fl">Password</label><input className="fi" type="password" placeholder="••••••••" value={form.password} onChange={e => set("password", e.target.value)} onKeyDown={e => e.key === "Enter" && !loading && go()} maxLength={200} /></div>
+            {error && <div className="ferr">{error}</div>}
+            <button className="btn bp" style={{ width:"100%", justifyContent:"center", marginTop:18, borderRadius:14, padding:"13px 0", fontSize:15 }} onClick={go} disabled={loading}>{loading ? "Please wait…" : mode === "login" ? "Sign In →" : "Create Account →"}</button>
+            <div className="fsw">{mode === "login" ? <>No account? <button onClick={() => { setMode("signup"); setError(""); }}>Sign up free</button></> : <>Have an account? <button onClick={() => { setMode("login"); setError(""); }}>Sign in</button></>}</div>
+          </>
+        )}
       </div>
     </div>
   );
