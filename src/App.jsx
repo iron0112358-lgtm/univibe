@@ -1177,6 +1177,76 @@ function ECard({ event, user, onSelect, onAction }) {
 }
 
 // ─── Auth Modal ───────────────────────────────────────────────────────────────
+function DoneScreen({ email, password, onAuth, onClose }) {
+  const [countdown, setCountdown] = useState(10);
+  const [trying,    setTrying]    = useState(false);
+  const [err,       setErr]       = useState("");
+  const name = nameFromEmail(email);
+
+  useEffect(() => {
+    if (countdown <= 0) { attemptSignIn(); return; }
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [countdown]);
+
+  const attemptSignIn = async () => {
+    if (trying) return;
+    setTrying(true); setErr("");
+    const r = await db.signIn(email, password);
+    if (r.error) {
+      setErr("Almost there! Try signing in manually.");
+      setTrying(false);
+    } else {
+      onAuth(r.data); onClose();
+    }
+  };
+
+  const pct = ((10 - countdown) / 10) * 100;
+
+  return (
+    <div style={{ textAlign:"center", padding:"8px 0 20px" }}>
+      <div style={{ fontSize:52, marginBottom:14 }}>🎉</div>
+      <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:800, fontSize:20, marginBottom:8 }}>
+        Welcome, {name}!
+      </div>
+      <div style={{ color:"var(--muted2)", fontSize:13, lineHeight:1.75, marginBottom:20 }}>
+        Your UniVibe account is being set up.<br/>
+        Signing you in automatically…
+      </div>
+
+      {/* Progress ring */}
+      <div style={{ position:"relative", width:80, height:80, margin:"0 auto 16px" }}>
+        <svg width="80" height="80" style={{ transform:"rotate(-90deg)" }}>
+          <circle cx="40" cy="40" r="34" fill="none" stroke="var(--bg4)" strokeWidth="5" />
+          <circle cx="40" cy="40" r="34" fill="none" stroke="var(--lime)" strokeWidth="5"
+            strokeDasharray={`${2 * Math.PI * 34}`}
+            strokeDashoffset={`${2 * Math.PI * 34 * (1 - pct/100)}`}
+            style={{ transition:"stroke-dashoffset 0.9s ease" }}
+          />
+        </svg>
+        <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center",
+          fontFamily:"'Space Grotesk',sans-serif", fontWeight:800, fontSize:22, color:"var(--lime)" }}>
+          {trying ? "✓" : countdown}
+        </div>
+      </div>
+
+      {err ? (
+        <>
+          <div style={{ color:"var(--pink)", fontSize:12, marginBottom:14 }}>{err}</div>
+          <button className="btn bp" style={{ width:"100%", justifyContent:"center", borderRadius:14, padding:"13px 0", fontSize:15 }}
+            onClick={attemptSignIn} disabled={trying}>
+            Sign In Now →
+          </button>
+        </>
+      ) : (
+        <div style={{ color:"var(--muted)", fontSize:12 }}>
+          {trying ? "Signing you in…" : `Auto signing in ${countdown > 0 ? `in ${countdown}s` : "…"}`}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AuthModal({ onClose, onAuth }) {
   const [mode,     setMode]    = useState("login");
   const [form,     setForm]    = useState({ email:"", password:"", confirm:"" });
@@ -1216,21 +1286,7 @@ function AuthModal({ onClose, onAuth }) {
         </div>
 
         {done ? (
-          <div style={{ textAlign:"center", padding:"8px 0 20px" }}>
-            <div style={{ fontSize:52, marginBottom:14 }}>🎉</div>
-            <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:800, fontSize:20, marginBottom:8 }}>
-              You're all set, {nameFromEmail(form.email)}!
-            </div>
-            <div style={{ color:"var(--muted2)", fontSize:13, lineHeight:1.75, marginBottom:24 }}>
-              Your UniVibe account has been created.<br/>
-              You can now sign in and start exploring<br/>
-              what's happening on campus. 🎓
-            </div>
-            <button className="btn bp" style={{ width:"100%", justifyContent:"center", borderRadius:14, padding:"13px 0", fontSize:15 }}
-              onClick={() => { setDone(false); setMode("login"); setForm({ email:form.email, password:"", confirm:"" }); }}>
-              Sign In Now →
-            </button>
-          </div>
+          <DoneScreen email={form.email} password={form.password} onAuth={onAuth} onClose={onClose} />
         ) : (
           <>
             <div className="fg">
