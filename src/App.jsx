@@ -157,7 +157,7 @@ const db = {
 
       // Auto-create profile if missing
       if (!name) {
-        name = email.split("@")[0];
+        name = nameFromEmail(email);
         await fetch(`${SB_URL}/rest/v1/users`, {
           method: "POST",
           headers: {
