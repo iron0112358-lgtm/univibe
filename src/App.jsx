@@ -774,6 +774,30 @@ const css = `
   .trend-rank.r1{background:linear-gradient(135deg,#F59E0B,#FCD34D);color:#0E0E12}
   .trend-rank.r2{background:linear-gradient(135deg,#9CA3AF,#D1D5DB);color:#0E0E12}
   .trend-rank.r3{background:linear-gradient(135deg,#B45309,#D97706);color:#fff}
+  /* FOOTER */
+  .footer{margin-top:64px;border-top:1px solid var(--border);padding:48px 0 32px}
+  .footer-inner{max-width:1200px;margin:0 auto;padding:0 20px}
+  .footer-top{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:40px}
+  .footer-brand{display:flex;flex-direction:column;gap:12px}
+  .footer-logo{height:52px;width:auto}
+  .footer-tagline{font-size:13px;color:var(--muted);font-style:italic;line-height:1.6}
+  .footer-copy{font-size:11px;color:var(--muted);margin-top:4px}
+  .footer-contact{display:flex;flex-direction:column;gap:20px}
+  .footer-contact-title{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;letter-spacing:-0.2px}
+  .footer-contact-desc{font-size:12px;color:var(--muted2);line-height:1.6;margin-bottom:8px}
+  .footer-email{display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);color:var(--purple);font-size:12px;font-weight:600;padding:7px 14px;border-radius:100px;text-decoration:none;transition:all 0.18s;width:fit-content}
+  .footer-email:hover{border-color:rgba(168,85,247,0.4);background:rgba(168,85,247,0.08)}
+  .footer-divider{height:1px;background:var(--border);margin-bottom:28px}
+  .footer-team-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;font-weight:600;margin-bottom:16px;text-align:center}
+  .footer-team{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+  .footer-member{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);border-radius:100px;padding:6px 14px 6px 6px;transition:all 0.18s}
+  .footer-member:hover{border-color:rgba(168,85,247,0.25)}
+  .footer-member-avatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--pink));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+  .footer-member-name{font-size:12px;font-weight:600;color:var(--muted2)}
+  .footer-bottom{text-align:center;padding-top:20px;border-top:1px solid var(--border)}
+  .footer-bottom-txt{font-size:11px;color:var(--muted)}
+  @media(max-width:768px){.footer-top{grid-template-columns:1fr}.footer-team{gap:6px}}
+
   @media(max-width:768px){.trend-grid{grid-template-columns:1fr}}
 
   /* PRIVATE TOGGLE */
@@ -914,6 +938,30 @@ const css = `
   .stitle{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;margin-bottom:14px;letter-spacing:-0.3px}
   .spinner{width:36px;height:36px;border:3px solid var(--bg4);border-top-color:var(--purple);border-radius:50%;animation:spin 0.7s linear infinite;margin:56px auto;display:block}
   @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* FOOTER */
+  .footer{margin-top:64px;border-top:1px solid var(--border);padding:48px 0 32px}
+  .footer-inner{max-width:1200px;margin:0 auto;padding:0 20px}
+  .footer-top{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:40px}
+  .footer-brand{display:flex;flex-direction:column;gap:12px}
+  .footer-logo{height:52px;width:auto}
+  .footer-tagline{font-size:13px;color:var(--muted);font-style:italic;line-height:1.6}
+  .footer-copy{font-size:11px;color:var(--muted);margin-top:4px}
+  .footer-contact{display:flex;flex-direction:column;gap:20px}
+  .footer-contact-title{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;letter-spacing:-0.2px}
+  .footer-contact-desc{font-size:12px;color:var(--muted2);line-height:1.6;margin-bottom:8px}
+  .footer-email{display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);color:var(--purple);font-size:12px;font-weight:600;padding:7px 14px;border-radius:100px;text-decoration:none;transition:all 0.18s;width:fit-content}
+  .footer-email:hover{border-color:rgba(168,85,247,0.4);background:rgba(168,85,247,0.08)}
+  .footer-divider{height:1px;background:var(--border);margin-bottom:28px}
+  .footer-team-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;font-weight:600;margin-bottom:16px;text-align:center}
+  .footer-team{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+  .footer-member{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);border-radius:100px;padding:6px 14px 6px 6px;transition:all 0.18s}
+  .footer-member:hover{border-color:rgba(168,85,247,0.25)}
+  .footer-member-avatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--pink));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+  .footer-member-name{font-size:12px;font-weight:600;color:var(--muted2)}
+  .footer-bottom{text-align:center;padding-top:20px;border-top:1px solid var(--border)}
+  .footer-bottom-txt{font-size:11px;color:var(--muted)}
+  @media(max-width:768px){.footer-top{grid-template-columns:1fr}.footer-team{gap:6px}}
 
   @media(max-width:768px){
     .nav-links{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}.ham{display:none}
@@ -1283,6 +1331,62 @@ function HomePage({ user, onSelect, onRefresh, onShowAuth }) {
           </div>
         )}
       </div>
+
+      {/* ── Footer ── */}
+      <footer className="footer">
+        <div className="footer-inner">
+          <div className="footer-top">
+
+            {/* Brand */}
+            <div className="footer-brand">
+              <img src="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png" alt="UniVibe" className="footer-logo" />
+              <div className="footer-tagline">"Where campus comes alive."</div>
+              <div className="footer-copy">© 2026 UniVibe · Kutaisi International University</div>
+            </div>
+
+            {/* Contact */}
+            <div className="footer-contact">
+              <div>
+                <div className="footer-contact-title">⚙️ Ideas, Feedback & Support</div>
+                <div className="footer-contact-desc">Got a feature idea, found a bug, or want to suggest an improvement? We're always listening.</div>
+                <a className="footer-email" href="mailto:chichinadze.saba@kiu.edu.ge">✉ chichinadze.saba@kiu.edu.ge</a>
+              </div>
+              <div>
+                <div className="footer-contact-title">🤝 Collaborations & Partnerships</div>
+                <div className="footer-contact-desc">Want to bring UniVibe to your organization or explore working together?</div>
+                <a className="footer-email" href="mailto:dvali.marita@kiu.edu.ge">✉ dvali.marita@kiu.edu.ge</a>
+              </div>
+            </div>
+
+          </div>
+
+          <div className="footer-divider" />
+
+          {/* Team */}
+          <div className="footer-team-title">Built with 🖤 by the UniVibe Team</div>
+          <div className="footer-team">
+            {[
+              { name:"Saba Chichinadze",    init:"SC" },
+              { name:"Elisabed Kobiashvili", init:"EK" },
+              { name:"Marita Dvali",         init:"MD" },
+              { name:"Gio Sagaradze",        init:"GS" },
+              { name:"Sesili Kasrashvili",   init:"SK" },
+              { name:"Mishiko Gogsadze",     init:"MG" },
+            ].map(m => (
+              <div key={m.name} className="footer-member">
+                <div className="footer-member-avatar">{m.init}</div>
+                <span className="footer-member-name">{m.name}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="footer-bottom" style={{ marginTop:24 }}>
+            <div className="footer-bottom-txt">Made in Georgia 🇬🇪 · univibe.ge</div>
+          </div>
+
+        </div>
+      </footer>
+
     </div></div>
   );
 }
