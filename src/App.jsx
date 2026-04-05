@@ -1178,70 +1178,85 @@ function ECard({ event, user, onSelect, onAction }) {
 
 // ─── Auth Modal ───────────────────────────────────────────────────────────────
 function DoneScreen({ email, password, onAuth, onClose }) {
-  const [countdown, setCountdown] = useState(10);
-  const [trying,    setTrying]    = useState(false);
-  const [err,       setErr]       = useState("");
+  const [attempt,  setAttempt]  = useState(0);
+  const [showManual, setShowManual] = useState(false);
+  const [trying,   setTrying]   = useState(false);
+  const [dots,     setDots]     = useState(".");
   const name = nameFromEmail(email);
 
+  // Animate dots
   useEffect(() => {
-    if (countdown <= 0) { attemptSignIn(); return; }
-    const t = setTimeout(() => setCountdown(c => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [countdown]);
+    const t = setInterval(() => setDots(d => d.length >= 3 ? "." : d + "."), 500);
+    return () => clearInterval(t);
+  }, []);
 
-  const attemptSignIn = async () => {
-    if (trying) return;
-    setTrying(true); setErr("");
+  // Auto retry every 5 seconds, show manual button after 60s
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (attempt >= 12) { setShowManual(true); return; } // 12 * 5s = 60s
+      trySignIn();
+    }, attempt === 0 ? 3000 : 5000); // first try after 3s, then every 5s
+    return () => clearTimeout(t);
+  }, [attempt]);
+
+  const trySignIn = async () => {
+    setTrying(true);
     const r = await db.signIn(email, password);
-    if (r.error) {
-      setErr("Almost there! Try signing in manually.");
-      setTrying(false);
-    } else {
-      onAuth(r.data); onClose();
-    }
+    setTrying(false);
+    if (!r.error) { onAuth(r.data); onClose(); return; }
+    setAttempt(a => a + 1);
   };
 
-  const pct = ((10 - countdown) / 10) * 100;
+  const messages = [
+    "Setting up your account",
+    "Verifying your KIU email",
+    "Almost there",
+    "Just a moment",
+    "Preparing your profile",
+  ];
+  const msg = messages[attempt % messages.length];
 
   return (
     <div style={{ textAlign:"center", padding:"8px 0 20px" }}>
-      <div style={{ fontSize:52, marginBottom:14 }}>🎉</div>
+      <div style={{ fontSize:52, marginBottom:14 }}>🎓</div>
       <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:800, fontSize:20, marginBottom:8 }}>
-        Welcome, {name}!
+        Welcome to UniVibe, {name}!
       </div>
-      <div style={{ color:"var(--muted2)", fontSize:13, lineHeight:1.75, marginBottom:20 }}>
-        Your UniVibe account is being set up.<br/>
-        Signing you in automatically…
+      <div style={{ color:"var(--muted2)", fontSize:13, lineHeight:1.75, marginBottom:28 }}>
+        Your account has been created.<br/>
+        We're signing you in automatically.
       </div>
 
-      {/* Progress ring */}
-      <div style={{ position:"relative", width:80, height:80, margin:"0 auto 16px" }}>
-        <svg width="80" height="80" style={{ transform:"rotate(-90deg)" }}>
-          <circle cx="40" cy="40" r="34" fill="none" stroke="var(--bg4)" strokeWidth="5" />
-          <circle cx="40" cy="40" r="34" fill="none" stroke="var(--lime)" strokeWidth="5"
-            strokeDasharray={`${2 * Math.PI * 34}`}
-            strokeDashoffset={`${2 * Math.PI * 34 * (1 - pct/100)}`}
-            style={{ transition:"stroke-dashoffset 0.9s ease" }}
-          />
-        </svg>
-        <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center",
-          fontFamily:"'Space Grotesk',sans-serif", fontWeight:800, fontSize:22, color:"var(--lime)" }}>
-          {trying ? "✓" : countdown}
+      {/* Pulsing orb */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:12, marginBottom:20 }}>
+        <div style={{ display:"flex", gap:6 }}>
+          {[0,1,2].map(i => (
+            <div key={i} style={{
+              width:10, height:10, borderRadius:"50%",
+              background:"var(--purple)",
+              animation:`pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+              opacity: trying ? 1 : 0.4,
+            }} />
+          ))}
         </div>
       </div>
 
-      {err ? (
-        <>
-          <div style={{ color:"var(--pink)", fontSize:12, marginBottom:14 }}>{err}</div>
-          <button className="btn bp" style={{ width:"100%", justifyContent:"center", borderRadius:14, padding:"13px 0", fontSize:15 }}
-            onClick={attemptSignIn} disabled={trying}>
-            Sign In Now →
-          </button>
-        </>
-      ) : (
-        <div style={{ color:"var(--muted)", fontSize:12 }}>
-          {trying ? "Signing you in…" : `Auto signing in ${countdown > 0 ? `in ${countdown}s` : "…"}`}
-        </div>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { transform: scale(0.7); opacity: 0.3; }
+          50% { transform: scale(1.2); opacity: 1; }
+        }
+      `}</style>
+
+      <div style={{ color:"var(--muted)", fontSize:12, marginBottom:24, minHeight:18 }}>
+        {showManual ? "Taking longer than expected…" : `${msg}${dots}`}
+      </div>
+
+      {showManual && (
+        <button className="btn bp" style={{ width:"100%", justifyContent:"center", borderRadius:14, padding:"13px 0", fontSize:15 }}
+          onClick={trySignIn} disabled={trying}>
+          {trying ? "Signing in…" : "Sign In Now →"}
+        </button>
       )}
     </div>
   );
