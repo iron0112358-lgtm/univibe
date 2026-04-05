@@ -779,7 +779,7 @@ const css = `
   .footer-inner{max-width:1200px;margin:0 auto;padding:0 20px}
   .footer-top{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:40px}
   .footer-brand{display:flex;flex-direction:column;gap:12px}
-  .footer-logo{height:52px;width:auto}
+  .footer-logo{height:52px;width:auto;max-width:160px;object-fit:contain}
   .footer-tagline{font-size:13px;color:var(--muted);font-style:italic;line-height:1.6}
   .footer-copy{font-size:11px;color:var(--muted);margin-top:4px}
   .footer-contact{display:flex;flex-direction:column;gap:20px}
@@ -944,7 +944,7 @@ const css = `
   .footer-inner{max-width:1200px;margin:0 auto;padding:0 20px}
   .footer-top{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:40px}
   .footer-brand{display:flex;flex-direction:column;gap:12px}
-  .footer-logo{height:52px;width:auto}
+  .footer-logo{height:52px;width:auto;max-width:160px;object-fit:contain}
   .footer-tagline{font-size:13px;color:var(--muted);font-style:italic;line-height:1.6}
   .footer-copy{font-size:11px;color:var(--muted);margin-top:4px}
   .footer-contact{display:flex;flex-direction:column;gap:20px}
