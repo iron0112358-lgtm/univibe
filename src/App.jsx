@@ -109,30 +109,14 @@ const db = {
       email = String(email || "").trim().toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email." };
       if (!email.endsWith("@kiu.edu.ge")) return { error: "Only KIU university emails (@kiu.edu.ge) are allowed." };
-      if (String(password || "").length < 6) return { error: "Password must be 6+ characters." };
-
-      const name = nameFromEmail(email);
+      if (String(password || "").length < 6) return { error: "Password must be at least 6 characters." };
 
       const { data: auth, error: authErr } = await sbAuth("signup", { email, password });
       if (authErr) return { error: authErr };
 
-      // Email confirmation required — don't create session yet
-      // Save profile in users table for when they confirm
-      const userId = auth.user?.id;
-      if (userId) {
-        await fetch(`${SB_URL}/rest/v1/users`, {
-          method: "POST",
-          headers: {
-            "apikey": SB_KEY,
-            "Authorization": `Bearer ${SB_KEY}`,
-            "Content-Type": "application/json",
-            "Prefer": "return=minimal",
-          },
-          body: JSON.stringify({ id: userId, name, email }),
-        });
-      }
-
-      return { data: "verify" }; // signal to show verify message
+      // Don't save to public.users yet — only save on first successful sign in
+      // This ensures only real verified emails get into the platform
+      return { data: "verify" };
     }, { error: "Sign up failed. Please try again." });
   },
 
@@ -1195,21 +1179,31 @@ function ECard({ event, user, onSelect, onAction }) {
 // ─── Auth Modal ───────────────────────────────────────────────────────────────
 function AuthModal({ onClose, onAuth }) {
   const [mode,     setMode]    = useState("login");
-  const [form,     setForm]    = useState({ email:"", password:"" });
+  const [form,     setForm]    = useState({ email:"", password:"", confirm:"" });
   const [error,    setError]   = useState("");
   const [loading,  setLoading] = useState(false);
-  const [verified, setVerified] = useState(false);
+  const [done,     setDone]    = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const go  = async () => {
-    setError(""); setLoading(true);
+
+  const previewName = form.email.endsWith("@kiu.edu.ge") ? nameFromEmail(form.email) : "";
+
+  const go = async () => {
+    setError("");
+    if (mode === "signup") {
+      if (!form.email.endsWith("@kiu.edu.ge")) { setError("Only KIU university emails (@kiu.edu.ge) are allowed."); return; }
+      if (form.password.length < 6) { setError("Password must be at least 6 characters."); return; }
+      if (form.password !== form.confirm) { setError("Passwords don't match. Please try again."); return; }
+    }
+    setLoading(true);
     const r = mode === "login"
       ? await db.signIn(form.email, form.password)
       : await db.signUp(form.email, form.password);
     setLoading(false);
     if (r.error) { setError(r.error); return; }
-    if (r.data === "verify") { setVerified(true); return; }
+    if (r.data === "verify") { setDone(true); return; }
     onAuth(r.data); onClose();
   };
+
   return (
     <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
@@ -1217,27 +1211,70 @@ function AuthModal({ onClose, onAuth }) {
           <div style={{ display:"flex", alignItems:"center", justifyContent:"center", marginBottom:12 }}>
             <img src="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png" alt="UniVibe" style={{ height:200, width:"auto" }} />
           </div>
-          {!verified && <h2>{mode === "login" ? "Welcome back" : "Join UniVibe"}</h2>}
-          {!verified && <p>{mode === "login" ? "Sign in to join and create events" : "Start discovering campus life"}</p>}
+          {!done && <h2>{mode === "login" ? "Welcome back" : "Join UniVibe"}</h2>}
+          {!done && <p>{mode === "login" ? "Sign in to your KIU account" : "Create your campus account"}</p>}
         </div>
-        {verified ? (
-          <div style={{ textAlign:"center", padding:"12px 0 20px" }}>
-            <div style={{ fontSize:48, marginBottom:16 }}>📬</div>
-            <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:800, fontSize:18, marginBottom:10 }}>Check your KIU email!</div>
-            <div style={{ color:"var(--muted2)", fontSize:13, lineHeight:1.7, marginBottom:20 }}>
-              We sent a confirmation link to<br />
-              <strong style={{ color:"var(--purple)" }}>{form.email}</strong><br />
-              Click it to activate your UniVibe account.
+
+        {done ? (
+          <div style={{ textAlign:"center", padding:"8px 0 20px" }}>
+            <div style={{ fontSize:52, marginBottom:14 }}>🎉</div>
+            <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:800, fontSize:20, marginBottom:8 }}>
+              You're all set, {nameFromEmail(form.email)}!
             </div>
-            <button className="btn bp" style={{ width:"100%", justifyContent:"center", borderRadius:14, padding:"13px 0", fontSize:15 }} onClick={onClose}>Got it ✓</button>
+            <div style={{ color:"var(--muted2)", fontSize:13, lineHeight:1.75, marginBottom:24 }}>
+              Your UniVibe account has been created.<br/>
+              You can now sign in and start exploring<br/>
+              what's happening on campus. 🎓
+            </div>
+            <button className="btn bp" style={{ width:"100%", justifyContent:"center", borderRadius:14, padding:"13px 0", fontSize:15 }}
+              onClick={() => { setDone(false); setMode("login"); setForm({ email:form.email, password:"", confirm:"" }); }}>
+              Sign In Now →
+            </button>
           </div>
         ) : (
           <>
-            <div className="fg"><label className="fl">KIU Email</label><input className="fi" type="email" placeholder="you@kiu.edu.ge" value={form.email} onChange={e => set("email", e.target.value)} maxLength={200} /></div>
-            <div className="fg"><label className="fl">Password</label><input className="fi" type="password" placeholder="••••••••" value={form.password} onChange={e => set("password", e.target.value)} onKeyDown={e => e.key === "Enter" && !loading && go()} maxLength={200} /></div>
+            <div className="fg">
+              <label className="fl">KIU Email</label>
+              <input className="fi" type="email" placeholder="you@kiu.edu.ge" value={form.email}
+                onChange={e => set("email", e.target.value)} maxLength={200} autoComplete="email" />
+              {previewName && mode === "signup" && (
+                <div style={{ marginTop:6, fontSize:11, color:"var(--purple)", fontWeight:600, display:"flex", alignItems:"center", gap:5 }}>
+                  <span>✦</span> Your name on UniVibe: <strong>{previewName}</strong>
+                </div>
+              )}
+            </div>
+            <div className="fg">
+              <label className="fl">Password</label>
+              <input className="fi" type="password" placeholder="••••••••" value={form.password}
+                onChange={e => set("password", e.target.value)}
+                onKeyDown={e => e.key === "Enter" && mode === "login" && !loading && go()}
+                maxLength={200} autoComplete={mode === "login" ? "current-password" : "new-password"} />
+            </div>
+            {mode === "signup" && (
+              <div className="fg">
+                <label className="fl">Confirm Password</label>
+                <input className="fi" type="password" placeholder="••••••••" value={form.confirm}
+                  onChange={e => set("confirm", e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && !loading && go()}
+                  maxLength={200} autoComplete="new-password" />
+                {form.confirm && (
+                  <div style={{ marginTop:6, fontSize:11, fontWeight:600, color: form.password === form.confirm ? "var(--lime)" : "var(--pink)", display:"flex", alignItems:"center", gap:4 }}>
+                    {form.password === form.confirm ? "✓ Passwords match" : "✗ Passwords don't match"}
+                  </div>
+                )}
+              </div>
+            )}
             {error && <div className="ferr">{error}</div>}
-            <button className="btn bp" style={{ width:"100%", justifyContent:"center", marginTop:18, borderRadius:14, padding:"13px 0", fontSize:15 }} onClick={go} disabled={loading}>{loading ? "Please wait…" : mode === "login" ? "Sign In →" : "Create Account →"}</button>
-            <div className="fsw">{mode === "login" ? <>No account? <button onClick={() => { setMode("signup"); setError(""); }}>Sign up free</button></> : <>Have an account? <button onClick={() => { setMode("login"); setError(""); }}>Sign in</button></>}</div>
+            <button className="btn bp" style={{ width:"100%", justifyContent:"center", marginTop:18, borderRadius:14, padding:"13px 0", fontSize:15 }}
+              onClick={go} disabled={loading}>
+              {loading ? "Please wait…" : mode === "login" ? "Sign In →" : "Create Account →"}
+            </button>
+            <div className="fsw">
+              {mode === "login"
+                ? <>No account? <button onClick={() => { setMode("signup"); setError(""); setForm({ email:form.email, password:"", confirm:"" }); }}>Sign up free</button></>
+                : <>Have an account? <button onClick={() => { setMode("login"); setError(""); setForm({ email:form.email, password:"", confirm:"" }); }}>Sign in</button></>
+              }
+            </div>
           </>
         )}
       </div>
