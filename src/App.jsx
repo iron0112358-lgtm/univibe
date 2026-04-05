@@ -796,7 +796,15 @@ const css = `
   .footer-member-name{font-size:12px;font-weight:600;color:var(--muted2)}
   .footer-bottom{text-align:center;padding-top:20px;border-top:1px solid var(--border)}
   .footer-bottom-txt{font-size:11px;color:var(--muted)}
-  @media(max-width:768px){.footer-top{grid-template-columns:1fr;gap:32px}.footer-brand{padding-right:0}.footer-contact{padding-left:0}.footer-team{gap:6px}}
+  @media(max-width:768px){
+    .footer-top{grid-template-columns:1fr;gap:32px}
+    .footer-brand{padding-right:0;align-items:center;text-align:center}
+    .footer-contact{padding-left:0}
+    .footer-team{gap:6px;flex-wrap:wrap}
+    .footer-logo{height:150px;max-width:150px}
+    .footer-divider-vert{display:none !important}
+    .footer-email{align-self:center}
+  }
 
   @media(max-width:768px){.trend-grid{grid-template-columns:1fr}}
 
@@ -961,7 +969,15 @@ const css = `
   .footer-member-name{font-size:12px;font-weight:600;color:var(--muted2)}
   .footer-bottom{text-align:center;padding-top:20px;border-top:1px solid var(--border)}
   .footer-bottom-txt{font-size:11px;color:var(--muted)}
-  @media(max-width:768px){.footer-top{grid-template-columns:1fr;gap:32px}.footer-brand{padding-right:0}.footer-contact{padding-left:0}.footer-team{gap:6px}}
+  @media(max-width:768px){
+    .footer-top{grid-template-columns:1fr;gap:32px}
+    .footer-brand{padding-right:0;align-items:center;text-align:center}
+    .footer-contact{padding-left:0}
+    .footer-team{gap:6px;flex-wrap:wrap}
+    .footer-logo{height:150px;max-width:150px}
+    .footer-divider-vert{display:none !important}
+    .footer-email{align-self:center}
+  }
 
   @media(max-width:768px){
     .nav-links{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}.ham{display:none}
@@ -1345,7 +1361,7 @@ function HomePage({ user, onSelect, onRefresh, onShowAuth }) {
             </div>
 
             {/* Divider */}
-            <div style={{ width:1, background:"var(--border)", alignSelf:"stretch", minHeight:120 }} />
+            <div className="footer-divider-vert" style={{ width:1, background:"var(--border)", alignSelf:"stretch", minHeight:120 }} />
 
             {/* Contact */}
             <div className="footer-contact">
