@@ -777,12 +777,12 @@ const css = `
   /* FOOTER */
   .footer{margin-top:64px;border-top:1px solid var(--border);padding:48px 0 32px}
   .footer-inner{max-width:1200px;margin:0 auto;padding:0 20px}
-  .footer-top{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:40px}
-  .footer-brand{display:flex;flex-direction:column;gap:12px}
-  .footer-logo{height:52px;width:auto;max-width:160px;object-fit:contain}
+  .footer-top{display:grid;grid-template-columns:1fr 1px 1fr;gap:0;margin-bottom:40px;align-items:center}
+  .footer-brand{display:flex;flex-direction:column;gap:12px;padding-right:40px}
+  .footer-logo{height:85px;width:auto;max-width:200px;object-fit:contain}
   .footer-tagline{font-size:13px;color:var(--muted);font-style:italic;line-height:1.6}
   .footer-copy{font-size:11px;color:var(--muted);margin-top:4px}
-  .footer-contact{display:flex;flex-direction:column;gap:20px}
+  .footer-contact{display:flex;flex-direction:column;gap:20px;padding-left:40px}
   .footer-contact-title{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;letter-spacing:-0.2px}
   .footer-contact-desc{font-size:12px;color:var(--muted2);line-height:1.6;margin-bottom:8px}
   .footer-email{display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);color:var(--purple);font-size:12px;font-weight:600;padding:7px 14px;border-radius:100px;text-decoration:none;transition:all 0.18s;width:fit-content}
@@ -796,7 +796,7 @@ const css = `
   .footer-member-name{font-size:12px;font-weight:600;color:var(--muted2)}
   .footer-bottom{text-align:center;padding-top:20px;border-top:1px solid var(--border)}
   .footer-bottom-txt{font-size:11px;color:var(--muted)}
-  @media(max-width:768px){.footer-top{grid-template-columns:1fr}.footer-team{gap:6px}}
+  @media(max-width:768px){.footer-top{grid-template-columns:1fr;gap:32px}.footer-brand{padding-right:0}.footer-contact{padding-left:0}.footer-team{gap:6px}}
 
   @media(max-width:768px){.trend-grid{grid-template-columns:1fr}}
 
@@ -942,12 +942,12 @@ const css = `
   /* FOOTER */
   .footer{margin-top:64px;border-top:1px solid var(--border);padding:48px 0 32px}
   .footer-inner{max-width:1200px;margin:0 auto;padding:0 20px}
-  .footer-top{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:40px}
-  .footer-brand{display:flex;flex-direction:column;gap:12px}
-  .footer-logo{height:52px;width:auto;max-width:160px;object-fit:contain}
+  .footer-top{display:grid;grid-template-columns:1fr 1px 1fr;gap:0;margin-bottom:40px;align-items:center}
+  .footer-brand{display:flex;flex-direction:column;gap:12px;padding-right:40px}
+  .footer-logo{height:85px;width:auto;max-width:200px;object-fit:contain}
   .footer-tagline{font-size:13px;color:var(--muted);font-style:italic;line-height:1.6}
   .footer-copy{font-size:11px;color:var(--muted);margin-top:4px}
-  .footer-contact{display:flex;flex-direction:column;gap:20px}
+  .footer-contact{display:flex;flex-direction:column;gap:20px;padding-left:40px}
   .footer-contact-title{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;letter-spacing:-0.2px}
   .footer-contact-desc{font-size:12px;color:var(--muted2);line-height:1.6;margin-bottom:8px}
   .footer-email{display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);color:var(--purple);font-size:12px;font-weight:600;padding:7px 14px;border-radius:100px;text-decoration:none;transition:all 0.18s;width:fit-content}
@@ -961,7 +961,7 @@ const css = `
   .footer-member-name{font-size:12px;font-weight:600;color:var(--muted2)}
   .footer-bottom{text-align:center;padding-top:20px;border-top:1px solid var(--border)}
   .footer-bottom-txt{font-size:11px;color:var(--muted)}
-  @media(max-width:768px){.footer-top{grid-template-columns:1fr}.footer-team{gap:6px}}
+  @media(max-width:768px){.footer-top{grid-template-columns:1fr;gap:32px}.footer-brand{padding-right:0}.footer-contact{padding-left:0}.footer-team{gap:6px}}
 
   @media(max-width:768px){
     .nav-links{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}.ham{display:none}
@@ -1343,6 +1343,9 @@ function HomePage({ user, onSelect, onRefresh, onShowAuth }) {
               <div className="footer-tagline">"Where campus comes alive."</div>
               <div className="footer-copy">© 2026 UniVibe · Kutaisi International University</div>
             </div>
+
+            {/* Divider */}
+            <div style={{ width:1, background:"var(--border)", alignSelf:"stretch", minHeight:120 }} />
 
             {/* Contact */}
             <div className="footer-contact">
