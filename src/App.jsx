@@ -1534,6 +1534,18 @@ function HomePage({ user, onSelect, onRefresh, onShowAuth }) {
           </div>
 
           <div className="footer-bottom" style={{ marginTop:24 }}>
+            <a href="https://www.instagram.com/univibe_kiu/" target="_blank" rel="noopener noreferrer"
+              style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", width:40, height:40, borderRadius:12,
+                background:"linear-gradient(135deg,#833AB4,#C13584,#E1306C,#F77737)",
+                marginBottom:16, transition:"all 0.2s", boxShadow:"0 0 0 rgba(193,53,132,0)" }}
+              onMouseEnter={e => e.currentTarget.style.cssText += ";transform:scale(1.12);box-shadow:0 0 20px rgba(193,53,132,0.5)"}
+              onMouseLeave={e => { e.currentTarget.style.transform="scale(1)"; e.currentTarget.style.boxShadow="0 0 0 rgba(193,53,132,0)"; }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2" y="2" width="20" height="20" rx="5" stroke="white" strokeWidth="2"/>
+                <circle cx="12" cy="12" r="4.5" stroke="white" strokeWidth="2"/>
+                <circle cx="17.5" cy="6.5" r="1" fill="white"/>
+              </svg>
+            </a>
             <div className="footer-bottom-txt">Made in Georgia 🇬🇪 · univibe.ge</div>
           </div>
 
