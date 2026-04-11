@@ -304,10 +304,10 @@ const db = {
       const nData = await nRes.json();
       event.host_name = nData?.[0]?.name || "Unknown";
 
-      // Get attendee count
+      // Get attendee count — approved only
       const countRes = await fetch(
-        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${id}&select=id`,
-        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session?.token || SB_KEY}`, "Prefer": "count=exact" } }
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${id}&status=eq.approved&select=id`,
+        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Prefer": "count=exact" } }
       );
       const count = parseInt(countRes.headers.get("content-range")?.split("/")[1] || "0");
 
@@ -592,7 +592,7 @@ const db = {
     return wrap(async () => {
       const [evRes, attRes, catRes] = await Promise.all([
         fetch(`${SB_URL}/rest/v1/events?select=id`, { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Prefer": "count=exact" } }),
-        fetch(`${SB_URL}/rest/v1/event_attendees?select=id`, { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Prefer": "count=exact" } }),
+        fetch(`${SB_URL}/rest/v1/event_attendees?select=id&status=eq.approved`, { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Prefer": "count=exact" } }),
         fetch(`${SB_URL}/rest/v1/events?select=category`, { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }),
       ]);
       const totalEvents = parseInt(evRes.headers.get("content-range")?.split("/")[1] || "0");
@@ -1632,11 +1632,13 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
   const handleApprove = async (userId) => {
     const r = await db.approveRequest(event.id, userId);
     if (r.error) { onRefresh("error", r.error); return; }
-    setRequests(r => r.filter(u => u.id !== userId));
-    // Refresh event to get correct attendee count from DB
+    // Remove from requests list
+    setRequests(prev => prev.filter(u => u.id !== userId));
+    // Refresh full event data to get correct count
     const updated = await db.getEvent(event.id);
-    if (updated) setEvent(ev => ({ ...ev, attendee_count: updated.attendee_count }));
-    refreshParticipants();
+    if (updated) setEvent(updated);
+    // Refresh participants list if open
+    await refreshParticipants();
     onRefresh("ok", "Request approved! ✅");
   };
 
@@ -1830,7 +1832,7 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
               <div className="part-header" onClick={loadParticipants}>
                 <div className="part-title">
                   👥 Participants
-                  <span className="part-num">{event.attendee_count}</span>
+                  <span className="part-num">{showParts ? participants.length : event.attendee_count}</span>
                 </div>
                 <span style={{ color:"var(--muted)", fontSize:13 }}>{showParts ? "▲ Hide" : "▼ Show"}</span>
               </div>
