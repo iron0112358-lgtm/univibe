@@ -1630,14 +1630,21 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
   };
 
   const handleApprove = async (userId) => {
-    await db.approveRequest(event.id, userId);
+    const r = await db.approveRequest(event.id, userId);
+    if (r.error) { onRefresh("error", r.error); return; }
     setRequests(r => r.filter(u => u.id !== userId));
-    setEvent(ev => ({ ...ev, attendee_count: ev.attendee_count + 1 }));
+    // Refresh event to get correct attendee count from DB
+    const updated = await db.getEvent(event.id);
+    if (updated) setEvent(ev => ({ ...ev, attendee_count: updated.attendee_count }));
+    refreshParticipants();
+    onRefresh("ok", "Request approved! ✅");
   };
 
   const handleReject = async (userId) => {
-    await db.rejectRequest(event.id, userId);
+    const r = await db.rejectRequest(event.id, userId);
+    if (r.error) { onRefresh("error", r.error); return; }
     setRequests(r => r.filter(u => u.id !== userId));
+    onRefresh("ok", "Request rejected.");
   };
 
   const handleRequest = async () => {
@@ -1659,6 +1666,12 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
     setPartsLoading(true); setShowParts(true);
     const data = await db.getParticipants(event.id);
     setParticipants(data); setPartsLoading(false);
+  };
+
+  const refreshParticipants = async () => {
+    if (!showParts) return;
+    const data = await db.getParticipants(event.id);
+    setParticipants(data);
   };
 
   const openEdit = () => {
@@ -1782,7 +1795,7 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
               <div className="req-header" onClick={loadRequests}>
                 <div className="req-title">
                   📬 Join Requests
-                  <span className="req-num">{requests.length > 0 && showReqs ? requests.length : "?"}</span>
+                  <span className="req-num">{showReqs ? requests.length : "?"}</span>
                 </div>
                 <span style={{ color:"var(--muted)", fontSize:13 }}>{showReqs ? "▲ Hide" : "▼ Show"}</span>
               </div>
