@@ -345,6 +345,24 @@ const db = {
     }, { error: "Could not create event. Please try again." });
   },
 
+  async updateEvent(eventId, data) {
+    return wrap(async () => {
+      if (!_session?.token) return { error: "Sign in required." };
+      const location = String(data.location || "").trim().slice(0, 300);
+      const d = new Date(data.date);
+      if (!location)          return { error: "Location is required." };
+      if (isNaN(d.getTime())) return { error: "Invalid date." };
+      if (d < new Date())     return { error: "Date cannot be in the past." };
+      const res = await fetch(`${SB_URL}/rest/v1/events?id=eq.${eventId}`, {
+        method: "PATCH",
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
+        body: JSON.stringify({ location, date: d.toISOString() }),
+      });
+      if (!res.ok) return { error: "Could not update event." };
+      return { data: true };
+    }, { error: "Could not update event." });
+  },
+
   async joinEvent(eventId, userId) {
     return wrap(async () => {
       if (!_session?.token) return { error: "Sign in required." };
@@ -842,6 +860,13 @@ const css = `
   .profile-stat-lbl{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-top:2px}
   .profile-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(163,230,53,0.1);border:1px solid rgba(163,230,53,0.25);color:var(--lime);padding:4px 12px;border-radius:100px;font-size:11px;font-weight:700;margin-top:8px}
   @media(max-width:480px){.profile-header{flex-direction:column;text-align:center}.profile-stats{justify-content:center}}
+
+  /* EDIT PANEL */
+  .edit-panel{margin-top:20px;background:var(--bg3);border-radius:16px;overflow:hidden;border:1px solid rgba(163,230,53,0.2)}
+  .edit-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:pointer;transition:background 0.16s}
+  .edit-header:hover{background:var(--bg4)}
+  .edit-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;color:var(--lime)}
+  .edit-body{padding:0 18px 18px;display:flex;flex-direction:column;gap:12px}
 
   /* PARTICIPANTS PANEL */
   .part-panel{margin-top:20px;background:var(--bg3);border-radius:16px;overflow:hidden;border:1px solid var(--border)}
@@ -1570,6 +1595,10 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
   const [showReqs,     setShowReqs]     = useState(false);
   const [requests,     setRequests]     = useState([]);
   const [reqsLoading,  setReqsLoading]  = useState(false);
+  const [showEdit,     setShowEdit]     = useState(false);
+  const [editForm,     setEditForm]     = useState({ location:"", date:"" });
+  const [editLoading,  setEditLoading]  = useState(false);
+  const [editError,    setEditError]    = useState("");
 
   useEffect(() => {
     (async () => {
@@ -1630,6 +1659,25 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
     setPartsLoading(true); setShowParts(true);
     const data = await db.getParticipants(event.id);
     setParticipants(data); setPartsLoading(false);
+  };
+
+  const openEdit = () => {
+    const d = new Date(event.date);
+    const pad = n => String(n).padStart(2,"0");
+    const local = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    setEditForm({ location: event.location, date: local });
+    setEditError("");
+    setShowEdit(e => !e);
+  };
+
+  const handleEdit = async () => {
+    setEditLoading(true); setEditError("");
+    const r = await db.updateEvent(event.id, editForm);
+    setEditLoading(false);
+    if (r.error) { setEditError(r.error); return; }
+    setEvent(ev => ({ ...ev, location: editForm.location, date: new Date(editForm.date).toISOString() }));
+    setShowEdit(false);
+    onRefresh("ok", "Event updated! ✅");
   };
 
   const toggle = async () => {
@@ -1699,8 +1747,35 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
                 : <button className={`btn blg ${joined?"bd":"bp"}`} onClick={toggle} disabled={acting}>{acting ? "…" : joined ? "Leave Event" : "✦ Join Event"}</button>
             )}
             <button className="btn bg blg" onClick={() => { shareEvent(event.id, event.title); onRefresh("ok", "Link copied! 🔗"); }}>🔗 Share</button>
+            {isHost && <button className="btn blg" onClick={openEdit} style={{ background:"rgba(163,230,53,0.1)", color:"var(--lime)", border:"1px solid rgba(163,230,53,0.25)" }}>✏️ Edit</button>}
             <button className="btn bg blg" onClick={onBack}>← Back</button>
           </div>
+
+          {isHost && showEdit && (
+            <div className="edit-panel">
+              <div className="edit-header" onClick={openEdit}>
+                <div className="edit-title">✏️ Edit Event Details</div>
+                <span style={{ color:"var(--muted)", fontSize:13 }}>▲ Close</span>
+              </div>
+              <div className="edit-body">
+                <div className="fg">
+                  <label className="fl">📍 Location</label>
+                  <input className="fi" placeholder="e.g. Main Hall, Room 101" value={editForm.location}
+                    onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))} maxLength={300} />
+                </div>
+                <div className="fg">
+                  <label className="fl">📅 Date & Time</label>
+                  <input className="fi" type="datetime-local" min={todayMin()} max={DATE_MAX} value={editForm.date}
+                    onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))} />
+                </div>
+                {editError && <div className="ferr">{editError}</div>}
+                <button className="btn bp" style={{ borderRadius:12, padding:"11px 0", justifyContent:"center" }}
+                  onClick={handleEdit} disabled={editLoading}>
+                  {editLoading ? "Saving…" : "✓ Save Changes"}
+                </button>
+              </div>
+            </div>
+          )}
 
           {canViewParticipants && event.is_private && (
             <div className="req-panel">
