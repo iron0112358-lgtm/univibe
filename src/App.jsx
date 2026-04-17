@@ -146,7 +146,7 @@ const db = {
           method: "POST",
           headers: {
             "apikey": SB_KEY,
-            "Authorization": `Bearer ${SB_KEY}`,
+            "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json",
             "Prefer": "return=minimal",
           },
@@ -355,7 +355,7 @@ const db = {
       if (d < new Date())     return { error: "Date cannot be in the past." };
       const res = await fetch(`${SB_URL}/rest/v1/events?id=eq.${eventId}`, {
         method: "PATCH",
-        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session.token}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
         body: JSON.stringify({ location, date: d.toISOString() }),
       });
       if (!res.ok) return { error: "Could not update event." };
@@ -370,7 +370,7 @@ const db = {
       if (ev && ev.attendee_count >= ev.max_participants) return { error: "This event is full." };
       const res = await fetch(`${SB_URL}/rest/v1/event_attendees`, {
         method: "POST",
-        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session.token}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
         body: JSON.stringify({ event_id: eventId, user_id: userId, status: "approved" }),
       });
       if (!res.ok) {
@@ -417,7 +417,7 @@ const db = {
         method: "POST",
         headers: {
           "apikey": SB_KEY,
-          "Authorization": `Bearer ${SB_KEY}`,
+          "Authorization": `Bearer ${_session.token}`,
           "Content-Type": "application/json",
           "Prefer": "return=minimal",
         },
@@ -481,10 +481,9 @@ const db = {
           method: "PATCH",
           headers: {
             "apikey": SB_KEY,
-            "Authorization": `Bearer ${SB_KEY}`,
+            "Authorization": `Bearer ${_session?.token || SB_KEY}`,
             "Content-Type": "application/json",
             "Prefer": "return=minimal",
-            "x-upsert": "false",
           },
           body: JSON.stringify({ status: "approved" }),
         }
@@ -528,8 +527,9 @@ const db = {
         method: "DELETE",
         headers: {
           "apikey": SB_KEY,
-          "Authorization": `Bearer ${SB_KEY}`,
+          "Authorization": `Bearer ${_session.token}`,
           "Content-Type": "application/json",
+          "Prefer": "return=minimal",
         },
       });
       if (!res.ok) return { error: "Could not delete event." };
