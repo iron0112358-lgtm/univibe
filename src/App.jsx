@@ -387,7 +387,7 @@ const db = {
     return wrap(async () => {
       if (!_session?.token) return { error: "Sign in required." };
       const res = await fetch(
-        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}`,
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}&status=eq.approved`,
         {
           method: "DELETE",
           headers: {
@@ -405,6 +405,14 @@ const db = {
   async requestJoin(eventId, userId) {
     return wrap(async () => {
       if (!_session?.token) return { error: "Sign in required." };
+      // Check if already has any record (pending or approved)
+      const checkRes = await fetch(
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}&select=status`,
+        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+      );
+      const existing = await checkRes.json();
+      if (existing?.[0]?.status === "approved") return { error: "already_joined" };
+      if (existing?.[0]?.status === "pending") return { error: "already_requested" };
       const res = await fetch(`${SB_URL}/rest/v1/event_attendees`, {
         method: "POST",
         headers: {
@@ -428,7 +436,7 @@ const db = {
   async cancelRequest(eventId, userId) {
     return wrap(async () => {
       const res = await fetch(
-        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}`,
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}&status=eq.pending`,
         { method: "DELETE", headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json" } }
       );
       if (!res.ok) return { error: "Could not cancel request." };
@@ -468,14 +476,24 @@ const db = {
   async approveRequest(eventId, userId) {
     return wrap(async () => {
       const res = await fetch(
-        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}`,
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}&status=eq.pending`,
         {
           method: "PATCH",
-          headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
+          headers: {
+            "apikey": SB_KEY,
+            "Authorization": `Bearer ${SB_KEY}`,
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+            "x-upsert": "false",
+          },
           body: JSON.stringify({ status: "approved" }),
         }
       );
-      if (!res.ok) return { error: "Could not approve." };
+      if (!res.ok) {
+        const err = await res.text();
+        console.error("approve error:", err);
+        return { error: "Could not approve." };
+      }
       return { data: true };
     }, { error: "Could not approve." });
   },
@@ -483,13 +501,22 @@ const db = {
   async rejectRequest(eventId, userId) {
     return wrap(async () => {
       const res = await fetch(
-        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}`,
+        `${SB_URL}/rest/v1/event_attendees?event_id=eq.${eventId}&user_id=eq.${userId}&status=eq.pending`,
         {
           method: "DELETE",
-          headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
+          headers: {
+            "apikey": SB_KEY,
+            "Authorization": `Bearer ${SB_KEY}`,
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+          },
         }
       );
-      if (!res.ok) return { error: "Could not reject." };
+      if (!res.ok) {
+        const err = await res.text();
+        console.error("reject error:", err);
+        return { error: "Could not reject." };
+      }
       return { data: true };
     }, { error: "Could not reject." });
   },
@@ -543,7 +570,7 @@ const db = {
     return wrap(async () => {
       // Get joined event IDs
       const attRes = await fetch(
-        `${SB_URL}/rest/v1/event_attendees?user_id=eq.${userId}&select=event_id`,
+        `${SB_URL}/rest/v1/event_attendees?user_id=eq.${userId}&status=eq.approved&select=event_id`,
         { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
       );
       const att = await attRes.json();
@@ -1797,7 +1824,7 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
               <div className="req-header" onClick={loadRequests}>
                 <div className="req-title">
                   📬 Join Requests
-                  <span className="req-num">{showReqs ? requests.length : "?"}</span>
+                  <span className="req-num">{showReqs ? requests.length : "📬"}</span>
                 </div>
                 <span style={{ color:"var(--muted)", fontSize:13 }}>{showReqs ? "▲ Hide" : "▼ Show"}</span>
               </div>
