@@ -1030,11 +1030,13 @@ const css = `
     .f2{grid-template-columns:1fr}.s2{grid-column:span 1}
     .stats{gap:8px}.scard{padding:10px 14px}
     .ccard{padding:20px 16px}.dcard-body{padding:18px 16px}
-    .hero-split{grid-template-columns:1fr}
-    .hero-left{border-right:none;border-bottom:none;padding:20px 16px;width:100%}
+    .hero-split{grid-template-columns:1fr;padding:0;margin:0 auto;width:100%;box-sizing:border-box}
+    .hero-left{border-right:none;border-bottom:none;padding:20px 20px;width:100%;box-sizing:border-box}
+    .hero-right{padding:20px 20px;box-sizing:border-box}
     .hero-logo{height:320px;max-width:85%}
-    .hero-right{padding:20px 24px}
     .hero h1{letter-spacing:-1px}
+    .page{padding:0 0 80px}
+    .container{padding:0 20px}
   }
   @media(max-width:480px){
     .hero h1{font-size:28px}
