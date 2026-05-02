@@ -7,15 +7,16 @@
     <title>UniVibe</title>
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <script>
-      window.OneSignalDeferred = window.OneSignalDeferred || [];
-      OneSignalDeferred.push(async function(OneSignal) {
-        await OneSignal.init({
-          appId: "d590965c-9ccb-47aa-b6af-43752244bd93",
-          notifyButton: { enable: false },
-          allowLocalhostAsSecureOrigin: false,
-        });
-      });
-    </script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "d590965c-9ccb-47aa-b6af-43752244bd93",
+      notifyButton: { enable: false },
+      welcomeNotification: { disable: true },
+      allowLocalhostAsSecureOrigin: false,
+    });
+  });
+</script>
   </head>
   <body>
     <div id="root"></div>
