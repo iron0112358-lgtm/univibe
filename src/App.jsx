@@ -833,6 +833,13 @@ const css = `
   .footer-member-name{font-size:12px;font-weight:600;color:var(--muted2)}
   .footer-bottom{text-align:center;padding-top:20px;border-top:1px solid var(--border)}
   .footer-bottom-txt{font-size:11px;color:var(--muted)}
+  /* NOTIFICATION PROMPT */
+  .notif-banner{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:250;background:var(--bg2);border:1px solid rgba(168,85,247,0.3);border-radius:16px;padding:14px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4);max-width:340px;width:calc(100% - 32px);animation:slideUp 0.3s ease}
+  .notif-banner-icon{font-size:24px;flex-shrink:0}
+  .notif-banner-text{flex:1;font-size:12px;color:var(--muted2);line-height:1.5}
+  .notif-banner-text strong{color:var(--text);display:block;margin-bottom:2px;font-size:13px}
+  .notif-banner-btns{display:flex;gap:6px;flex-shrink:0}
+
   @media(max-width:768px){
     .footer-top{grid-template-columns:1fr;gap:32px}
     .footer-brand{padding-right:0;align-items:center;text-align:center}
@@ -842,6 +849,13 @@ const css = `
     .footer-divider-vert{display:none !important}
     .footer-email{align-self:center}
   }
+
+  /* NOTIFICATION PROMPT */
+  .notif-banner{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:250;background:var(--bg2);border:1px solid rgba(168,85,247,0.3);border-radius:16px;padding:14px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4);max-width:340px;width:calc(100% - 32px);animation:slideUp 0.3s ease}
+  .notif-banner-icon{font-size:24px;flex-shrink:0}
+  .notif-banner-text{flex:1;font-size:12px;color:var(--muted2);line-height:1.5}
+  .notif-banner-text strong{color:var(--text);display:block;margin-bottom:2px;font-size:13px}
+  .notif-banner-btns{display:flex;gap:6px;flex-shrink:0}
 
   @media(max-width:768px){.trend-grid{grid-template-columns:1fr}}
 
@@ -1013,6 +1027,13 @@ const css = `
   .footer-member-name{font-size:12px;font-weight:600;color:var(--muted2)}
   .footer-bottom{text-align:center;padding-top:20px;border-top:1px solid var(--border)}
   .footer-bottom-txt{font-size:11px;color:var(--muted)}
+  /* NOTIFICATION PROMPT */
+  .notif-banner{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:250;background:var(--bg2);border:1px solid rgba(168,85,247,0.3);border-radius:16px;padding:14px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4);max-width:340px;width:calc(100% - 32px);animation:slideUp 0.3s ease}
+  .notif-banner-icon{font-size:24px;flex-shrink:0}
+  .notif-banner-text{flex:1;font-size:12px;color:var(--muted2);line-height:1.5}
+  .notif-banner-text strong{color:var(--text);display:block;margin-bottom:2px;font-size:13px}
+  .notif-banner-btns{display:flex;gap:6px;flex-shrink:0}
+
   @media(max-width:768px){
     .footer-top{grid-template-columns:1fr;gap:32px}
     .footer-brand{padding-right:0;align-items:center;text-align:center}
@@ -1022,6 +1043,13 @@ const css = `
     .footer-divider-vert{display:none !important}
     .footer-email{align-self:center}
   }
+
+  /* NOTIFICATION PROMPT */
+  .notif-banner{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:250;background:var(--bg2);border:1px solid rgba(168,85,247,0.3);border-radius:16px;padding:14px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4);max-width:340px;width:calc(100% - 32px);animation:slideUp 0.3s ease}
+  .notif-banner-icon{font-size:24px;flex-shrink:0}
+  .notif-banner-text{flex:1;font-size:12px;color:var(--muted2);line-height:1.5}
+  .notif-banner-text strong{color:var(--text);display:block;margin-bottom:2px;font-size:13px}
+  .notif-banner-btns{display:flex;gap:6px;flex-shrink:0}
 
   @media(max-width:768px){
     .nav-links{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}.ham{display:none}
@@ -1057,6 +1085,59 @@ function shareEvent(eventId, title) {
     navigator.clipboard.writeText(url).then(() => {}).catch(() => {});
   }
   return url;
+}
+
+// ─── OneSignal Notifications ──────────────────────────────────────────────────
+const ONESIGNAL_APP_ID = "d590965c-9ccb-47aa-b6af-43752244bd93";
+const ONESIGNAL_API = "https://onesignal.com/api/v1";
+
+async function requestNotificationPermission() {
+  try {
+    if (!window.OneSignal) return false;
+    const permission = await window.OneSignal.getNotificationPermission();
+    if (permission === "granted") return true;
+    if (permission === "denied") return false;
+    await window.OneSignal.showSlidedownPrompt();
+    return true;
+  } catch { return false; }
+}
+
+async function getOneSignalUserId() {
+  try {
+    if (!window.OneSignal) return null;
+    return await window.OneSignal.getUserId();
+  } catch { return null; }
+}
+
+async function scheduleEventReminder(event, userId) {
+  try {
+    const eventTime = new Date(event.date).getTime();
+    const reminderTime = eventTime - 24 * 60 * 60 * 1000; // 24h before
+    if (reminderTime <= Date.now()) return; // already past
+    const playerId = await getOneSignalUserId();
+    if (!playerId) return;
+    // Store reminder info in localStorage for manual sending
+    const reminders = JSON.parse(localStorage.getItem("uv_reminders") || "[]");
+    const existing = reminders.find(r => r.eventId === event.id && r.playerId === playerId);
+    if (!existing) {
+      reminders.push({
+        eventId: event.id,
+        playerId,
+        eventTitle: event.title,
+        eventLocation: event.location,
+        eventDate: event.date,
+        reminderTime,
+      });
+      localStorage.setItem("uv_reminders", JSON.stringify(reminders));
+    }
+  } catch {}
+}
+
+function removeEventReminder(eventId) {
+  try {
+    const reminders = JSON.parse(localStorage.getItem("uv_reminders") || "[]");
+    localStorage.setItem("uv_reminders", JSON.stringify(reminders.filter(r => r.eventId !== eventId)));
+  } catch {}
 }
 
 // ─── Small Components ─────────────────────────────────────────────────────────
@@ -1407,6 +1488,35 @@ function AuthModal({ onClose, onAuth }) {
   );
 }
 
+// ─── Notification Banner ──────────────────────────────────────────────────────
+function NotificationBanner({ event, onClose }) {
+  const [asking, setAsking] = useState(false);
+
+  const enable = async () => {
+    setAsking(true);
+    const granted = await requestNotificationPermission();
+    if (granted) await scheduleEventReminder(event, null);
+    setAsking(false);
+    onClose();
+  };
+
+  return (
+    <div className="notif-banner">
+      <div className="notif-banner-icon">🔔</div>
+      <div className="notif-banner-text">
+        <strong>Get a reminder!</strong>
+        We'll notify you 24h before this event starts.
+      </div>
+      <div className="notif-banner-btns">
+        <button className="btn bsm bg" onClick={onClose}>Later</button>
+        <button className="btn bsm bp" onClick={enable} disabled={asking}>
+          {asking ? "…" : "Remind Me"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Trending Section ─────────────────────────────────────────────────────────
 function TrendingSection({ user, onSelect, onShowAuth, onRefresh }) {
   const [events, setEvents] = useState([]);
@@ -1628,6 +1738,7 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
   const [editForm,     setEditForm]     = useState({ location:"", date:"" });
   const [editLoading,  setEditLoading]  = useState(false);
   const [editError,    setEditError]    = useState("");
+  const [showNotifBanner, setShowNotifBanner] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -1732,6 +1843,12 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
     if (r.error) { onRefresh("error", r.error); return; }
     const nj = !joined; setJoined(nj);
     setEvent(ev => ({ ...ev, attendee_count: ev.attendee_count + (nj ? 1 : -1) }));
+    if (nj) {
+      // Show notification prompt after joining
+      setTimeout(() => setShowNotifBanner(true), 800);
+    } else {
+      removeEventReminder(event.id);
+    }
     onRefresh("ok", nj ? "Joined! 🎉" : "Left event.");
   };
 
@@ -1748,6 +1865,9 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
   return (
     <div className="page"><div className="container" style={{ maxWidth:700 }}>
       <button className="back" onClick={onBack}>← Back to Events</button>
+      {showNotifBanner && event && (
+        <NotificationBanner event={event} onClose={() => setShowNotifBanner(false)} />
+      )}
       <div className="dcard">
         <div className={`dcard-banner dcard-banner-${event.category}`}>
           <div className="dcard-banner-inner">
