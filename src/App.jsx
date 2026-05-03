@@ -1257,8 +1257,9 @@ function JoinBtnFull({ event, user, onAction }) {
     } else {
       const r = joined ? await db.leaveEvent(event.id, user.id) : await db.joinEvent(event.id, user.id);
       if (r.error) { onAction("error:" + r.error); setLoading(false); return; }
-      setJoined(!joined);
-      onAction(joined ? "left" : "joined");
+      const wasJoined = joined;
+      setJoined(!wasJoined);
+      onAction(wasJoined ? "left" : "joined", !wasJoined ? event : null);
     }
     setLoading(false);
   };
@@ -1630,12 +1631,18 @@ function HomePage({ user, onSelect, onRefresh, onShowAuth }) {
   useEffect(() => { setPage(0); }, [cat, search]);
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const act = useCallback(async a => {
+  const act = useCallback(async (a, eventObj) => {
     if (a === "auth")           { onShowAuth(); return; }
     if (a === "share")          { onRefresh("ok", "Link copied! 🔗"); return; }
     if (a === "deleted")        { await load(); onRefresh("ok", "Event deleted."); return; }
     if (a.startsWith("error:")) { onRefresh("error", a.slice(6)); return; }
-    await load(); onRefresh("ok", a === "joined" ? "Joined! 🎉" : "Left event.");
+    await load();
+    if (a === "joined" && eventObj) {
+      onRefresh("ok", "Joined! 🎉");
+      if (typeof onNotif === 'function') setTimeout(() => onNotif(eventObj), 1000);
+    } else {
+      onRefresh("ok", "Left event.");
+    }
   }, [load, onRefresh, onShowAuth]);
 
   return (
@@ -2134,7 +2141,7 @@ function MyPage({ user, onSelect, onRefresh, onShowAuth }) {
   const list    = tab === "joined" ? data.joined : data.created;
   const isAdmin = user.email === ADMIN_EMAIL;
   const memberSince = new Date(user.created_at || Date.now()).getFullYear();
-  const act  = async a => {
+  const act  = async (a, eventObj) => {
     if (a === "auth")           { onShowAuth(); return; }
     if (a === "share")          { onRefresh("ok", "Link copied! 🔗"); return; }
     if (a === "deleted")        { const d = await db.getMyEvents(user.id); setData(d); onRefresh("ok", "Event deleted."); return; }
@@ -2193,6 +2200,7 @@ export default function App() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [tick, setTick]             = useState(0);
   const [booting, setBooting]       = useState(true);
+  const [notifEvent, setNotifEvent] = useState(null);
 
   // On first load: restore session + handle shared event links
   useEffect(() => {
@@ -2247,13 +2255,14 @@ export default function App() {
           </div>
         </nav>
         <ErrorBoundary>
-          {page==="home"   && <HomePage  key={tick} user={user} onSelect={sel} onRefresh={refresh} onShowAuth={() => setShowAuth(true)} />}
+          {page==="home"   && <HomePage  key={tick} user={user} onSelect={sel} onRefresh={refresh} onShowAuth={() => setShowAuth(true)} onNotif={e => setNotifEvent(e)} />}
           {page==="detail" && selId && <DetailPage eventId={selId} user={user} onBack={() => nav("home")} onShowAuth={() => setShowAuth(true)} onRefresh={refresh} />}
           {page==="create" && <CreatePage user={user} onBack={() => nav("home")} onShowAuth={() => setShowAuth(true)} onCreated={() => { showToast("ok","Event published! 🎉"); nav("home"); setTick(t => t+1); }} />}
           {page==="my"     && <MyPage key={tick} user={user} onSelect={sel} onRefresh={refresh} onShowAuth={() => setShowAuth(true)} />}
         </ErrorBoundary>
         {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuth={u => { setUser(u); showToast("ok", `Welcome, ${u.name}! 🎓`); }} />}
         {toast && <Toast key={toast.k} msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+        {notifEvent && <NotificationBanner event={notifEvent} onClose={() => setNotifEvent(null)} />}
       </div>
     </ErrorBoundary>
   );
