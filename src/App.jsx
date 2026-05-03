@@ -1093,33 +1093,59 @@ const ONESIGNAL_REST_KEY = "os_v2_app_2wijmxe4znd2vnvpin2serf5smagb5ve2ome6kn32j
 
 async function requestNotificationPermission() {
   try {
-    if (!window.OneSignal) return false;
-    const permission = await window.OneSignal.Notifications.permission;
-    if (permission) return true;
-    await window.OneSignal.Slidedown.promptPush();
-    // Wait a moment for user to respond
-    await new Promise(r => setTimeout(r, 1500));
-    return window.OneSignal.Notifications.permission;
-  } catch { return false; }
+    if (!window.OneSignal) { console.log("OneSignal not loaded"); return false; }
+    // Check current permission
+    const perm = window.OneSignal.Notifications?.permission
+      ?? (await window.OneSignal.isPushNotificationsEnabled?.())
+      ?? false;
+    if (perm) { console.log("Already permitted"); return true; }
+    // Show prompt
+    if (window.OneSignal.Slidedown?.promptPush) {
+      await window.OneSignal.Slidedown.promptPush();
+    } else if (window.OneSignal.showSlidedownPrompt) {
+      await window.OneSignal.showSlidedownPrompt();
+    }
+    await new Promise(r => setTimeout(r, 2000));
+    const newPerm = window.OneSignal.Notifications?.permission
+      ?? (await window.OneSignal.isPushNotificationsEnabled?.())
+      ?? false;
+    console.log("Permission after prompt:", newPerm);
+    return !!newPerm;
+  } catch(e) { console.log("Permission error:", e); return false; }
 }
 
 async function getOneSignalPlayerId() {
   try {
-    if (!window.OneSignal) return null;
-    const id = await window.OneSignal.User.PushSubscription.id;
-    return id || null;
-  } catch { return null; }
+    if (!window.OneSignal) { console.log("❌ OneSignal not loaded"); return null; }
+    // Wait for OneSignal to be ready
+    await new Promise(r => setTimeout(r, 500));
+    // v16 SDK
+    const subId = window.OneSignal.User?.PushSubscription?.id;
+    if (subId) { console.log("✅ Player ID (v16):", subId); return subId; }
+    // Legacy
+    const legacyId = await window.OneSignal.getUserId?.();
+    if (legacyId) { console.log("✅ Player ID (legacy):", legacyId); return legacyId; }
+    console.log("❌ No player ID found. Is push enabled?");
+    return null;
+  } catch(e) { console.log("getPlayerId error:", e); return null; }
 }
 
 async function scheduleEventReminder(event) {
   try {
     const eventTime = new Date(event.date).getTime();
-    const reminderTime = Math.floor((eventTime - 24 * 60 * 60 * 1000) / 1000);
-    if (reminderTime <= Math.floor(Date.now() / 1000)) return; // already past
+    const reminderTime = eventTime - 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    console.log("Event time:", new Date(eventTime).toISOString());
+    console.log("Reminder time:", new Date(reminderTime).toISOString());
+    console.log("Now:", new Date(now).toISOString());
+    if (reminderTime <= now) {
+      console.log("❌ Reminder time is in the past, skipping");
+      return;
+    }
     const playerId = await getOneSignalPlayerId();
-    if (!playerId) return;
-    // Send scheduled notification via OneSignal REST API
-    const sendAt = new Date(reminderTime * 1000).toUTCString();
+    if (!playerId) { console.log("❌ No player ID, cannot schedule"); return; }
+    const sendAt = new Date(reminderTime).toUTCString();
+    console.log("Scheduling notification for:", sendAt, "Player:", playerId);
     const res = await fetch("https://onesignal.com/api/v1/notifications", {
       method: "POST",
       headers: {
@@ -1128,18 +1154,18 @@ async function scheduleEventReminder(event) {
       },
       body: JSON.stringify({
         app_id: ONESIGNAL_APP_ID,
-        include_subscription_ids: [playerId],
+        include_player_ids: [playerId],
         send_after: sendAt,
         headings: { en: "UniVibe 🎓" },
-        contents: { en: `⏰ Tomorrow! ${event.title} starts at ${fmtTime(event.date)} · 📍 ${event.location}` },
+        contents: { en: `⏰ Reminder! ${event.title} starts tomorrow · 📍 ${event.location}` },
         url: `https://univibe.ge/?event=${event.id}`,
         chrome_web_icon: "https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png",
-        chrome_web_badge: "https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png",
         web_url: `https://univibe.ge/?event=${event.id}`,
+        isAnyWeb: true,
       }),
     });
     const data = await res.json();
-    console.log("Reminder scheduled:", data);
+    console.log("📬 OneSignal response:", JSON.stringify(data));
   } catch(e) { console.log("reminder schedule error:", e); }
 }
 
