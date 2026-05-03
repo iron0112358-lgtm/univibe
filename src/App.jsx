@@ -1144,28 +1144,28 @@ async function scheduleEventReminder(event) {
     }
     const playerId = await getOneSignalPlayerId();
     if (!playerId) { console.log("❌ No player ID, cannot schedule"); return; }
-    const sendAt = new Date(reminderTime).toUTCString();
-    console.log("Scheduling notification for:", sendAt, "Player:", playerId);
-    const res = await fetch("https://onesignal.com/api/v1/notifications", {
+    const sendAt = new Date(reminderTime).toISOString();
+    console.log("💾 Storing reminder for:", sendAt, "Player:", playerId);
+    // Store in Supabase — Supabase Edge Function will send via OneSignal (no CORS issues)
+    const res = await fetch(`${SB_URL}/rest/v1/event_reminders`, {
       method: "POST",
       headers: {
+        "apikey": SB_KEY,
+        "Authorization": `Bearer ${_session?.token || SB_KEY}`,
         "Content-Type": "application/json",
-        "Authorization": `Key ${ONESIGNAL_REST_KEY}`,
+        "Prefer": "return=minimal,resolution=merge-duplicates",
       },
       body: JSON.stringify({
-        app_id: ONESIGNAL_APP_ID,
-        include_player_ids: [playerId],
-        send_after: sendAt,
-        headings: { en: "UniVibe 🎓" },
-        contents: { en: `⏰ Reminder! ${event.title} starts tomorrow · 📍 ${event.location}` },
-        url: `https://univibe.ge/?event=${event.id}`,
-        chrome_web_icon: "https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png",
-        web_url: `https://univibe.ge/?event=${event.id}`,
-        isAnyWeb: true,
+        event_id: event.id,
+        player_id: playerId,
+        send_at: sendAt,
+        event_title: event.title,
+        event_location: event.location,
+        event_date: event.date,
+        sent: false,
       }),
     });
-    const data = await res.json();
-    console.log("📬 OneSignal response:", JSON.stringify(data));
+    console.log("💾 Reminder stored:", res.status, res.ok ? "✅" : "❌");
   } catch(e) { console.log("reminder schedule error:", e); }
 }
 
@@ -1611,7 +1611,7 @@ function TrendingSection({ user, onSelect, onShowAuth, onRefresh }) {
 }
 
 // ─── Home Page ────────────────────────────────────────────────────────────────
-function HomePage({ user, onSelect, onRefresh, onShowAuth }) {
+function HomePage({ user, onSelect, onRefresh, onShowAuth, onNotif }) {
   const [cat, setCat]         = useState("All");
   const [search, setSearch]   = useState("");
   const [page, setPage]       = useState(0);
