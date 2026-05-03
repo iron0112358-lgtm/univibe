@@ -1093,12 +1093,12 @@ const ONESIGNAL_REST_KEY = "os_v2_app_2wijmxe4znd2vnvpin2serf5snn3mqtreg5ezdmpm7
 
 async function requestNotificationPermission() {
   try {
-    if (!window.OneSignal) { console.log("OneSignal not loaded"); return false; }
+    if (!window.OneSignal) return false;
     // Check current permission
     const perm = window.OneSignal.Notifications?.permission
       ?? (await window.OneSignal.isPushNotificationsEnabled?.())
       ?? false;
-    if (perm) { console.log("Already permitted"); return true; }
+    if (perm) return true;
     // Show prompt
     if (window.OneSignal.Slidedown?.promptPush) {
       await window.OneSignal.Slidedown.promptPush();
@@ -1109,9 +1109,8 @@ async function requestNotificationPermission() {
     const newPerm = window.OneSignal.Notifications?.permission
       ?? (await window.OneSignal.isPushNotificationsEnabled?.())
       ?? false;
-    console.log("Permission after prompt:", newPerm);
     return !!newPerm;
-  } catch(e) { console.log("Permission error:", e); return false; }
+  } catch { return false; }
 }
 
 async function getOneSignalPlayerId() {
@@ -1124,10 +1123,9 @@ async function getOneSignalPlayerId() {
     if (subId) { console.log("✅ Player ID (v16):", subId); return subId; }
     // Legacy
     const legacyId = await window.OneSignal.getUserId?.();
-    if (legacyId) { console.log("✅ Player ID (legacy):", legacyId); return legacyId; }
-    console.log("❌ No player ID found. Is push enabled?");
+    if (legacyId) return legacyId;
     return null;
-  } catch(e) { console.log("getPlayerId error:", e); return null; }
+  } catch { return null; }
 }
 
 async function scheduleEventReminder(event) {
@@ -1135,17 +1133,12 @@ async function scheduleEventReminder(event) {
     const eventTime = new Date(event.date).getTime();
     const reminderTime = eventTime - 24 * 60 * 60 * 1000;
     const now = Date.now();
-    console.log("Event time:", new Date(eventTime).toISOString());
-    console.log("Reminder time:", new Date(reminderTime).toISOString());
-    console.log("Now:", new Date(now).toISOString());
     if (reminderTime <= now) {
-      console.log("❌ Reminder time is in the past, skipping");
       return;
     }
     const playerId = await getOneSignalPlayerId();
-    if (!playerId) { console.log("❌ No player ID, cannot schedule"); return; }
+    if (!playerId) return;
     const sendAt = new Date(reminderTime).toISOString();
-    console.log("💾 Storing reminder for:", sendAt, "Player:", playerId);
     // Store in Supabase — Supabase Edge Function will send via OneSignal (no CORS issues)
     const res = await fetch(`${SB_URL}/rest/v1/event_reminders`, {
       method: "POST",
@@ -1165,8 +1158,7 @@ async function scheduleEventReminder(event) {
         sent: false,
       }),
     });
-    console.log("💾 Reminder stored:", res.status, res.ok ? "✅" : "❌");
-  } catch(e) { console.log("reminder schedule error:", e); }
+  } catch {}
 }
 
 function removeEventReminder(eventId) {
