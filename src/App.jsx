@@ -1089,7 +1089,7 @@ function shareEvent(eventId, title) {
 
 // ─── OneSignal Notifications ──────────────────────────────────────────────────
 const ONESIGNAL_APP_ID  = "d590965c-9ccb-47aa-b6af-43752244bd93";
-const ONESIGNAL_REST_KEY = "os_v2_app_2wijmxe4znd2vnvpin2serf5smagb5ve2ome6kn32jecfgdyy4z6wsgwoosjde426ysbre4fzmbbsa7fmt47ny2gfrcm5m7lot2kg7q";
+const ONESIGNAL_REST_KEY = "os_v2_app_2wijmxe4znd2vnvpin2serf5snn3mqtreg5ezdmpm7ukhrtqhs7jhoi5rnfb6n7r4pfh2c4pjsnr75drvlq7vkbw7awjytvg2h3yv2q";
 
 async function requestNotificationPermission() {
   try {
