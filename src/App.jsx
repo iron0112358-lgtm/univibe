@@ -2136,14 +2136,8 @@ function NotifStatusButton({ onRefresh }) {
   const [subscribed, setSubscribed] = useState(false);
 
   useEffect(() => {
-    const check = async () => {
-      const prompted = localStorage.getItem("uv_notif_prompted");
-      const permission = window.OneSignal?.Notifications?.permission
-        ?? (await window.OneSignal?.isPushNotificationsEnabled?.())
-        ?? false;
-      setSubscribed(!!(prompted && permission));
-    };
-    check();
+    const prompted = localStorage.getItem("uv_notif_prompted");
+    setSubscribed(!!prompted);
   }, []);
 
   if (subscribed) return (
