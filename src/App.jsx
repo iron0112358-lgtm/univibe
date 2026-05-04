@@ -169,17 +169,17 @@ const db = {
   async deleteAccount(userId) {
     return wrap(async () => {
       if (!_session?.token) return { error: "Sign in required." };
-      // Delete from public.users first
-      await fetch(`${SB_URL}/rest/v1/users?id=eq.${userId}`, {
+      // Delete from public.users — auth entry becomes inactive ghost
+      const res = await fetch(`${SB_URL}/rest/v1/users?id=eq.${userId}`, {
         method: "DELETE",
-        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session.token}`, "Content-Type": "application/json" },
-      });
-      // Delete from auth.users via Supabase auth API
-      const res = await fetch(`${SB_URL}/auth/v1/user`, {
-        method: "DELETE",
-        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session.token}`, "Content-Type": "application/json" },
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session.token}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
       });
       if (!res.ok) return { error: "Could not delete account." };
+      // Also delete event_attendees
+      await fetch(`${SB_URL}/rest/v1/event_attendees?user_id=eq.${userId}`, {
+        method: "DELETE",
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session.token}`, "Content-Type": "application/json" },
+      });
       return { data: true };
     }, { error: "Could not delete account." });
   },
