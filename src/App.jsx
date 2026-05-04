@@ -1900,8 +1900,12 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
     const nj = !joined; setJoined(nj);
     setEvent(ev => ({ ...ev, attendee_count: ev.attendee_count + (nj ? 1 : -1) }));
     if (nj) {
-      // Show notification prompt after joining
-      setTimeout(() => setShowNotifBanner(true), 800);
+      // Only show banner if not already subscribed
+      const alreadyPrompted = localStorage.getItem("uv_notif_prompted");
+      const isSubscribed = window.OneSignal?.Notifications?.permission;
+      if (!alreadyPrompted || !isSubscribed) {
+        setTimeout(() => setShowNotifBanner(true), 800);
+      }
     } else {
       removeEventReminder(event.id);
     }
