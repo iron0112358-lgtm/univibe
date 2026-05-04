@@ -1900,10 +1900,9 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
     const nj = !joined; setJoined(nj);
     setEvent(ev => ({ ...ev, attendee_count: ev.attendee_count + (nj ? 1 : -1) }));
     if (nj) {
-      // Only show banner if not already subscribed
+      // Only show banner if not already prompted
       const alreadyPrompted = localStorage.getItem("uv_notif_prompted");
-      const isSubscribed = window.OneSignal?.Notifications?.permission;
-      if (!alreadyPrompted || !isSubscribed) {
+      if (!alreadyPrompted) {
         setTimeout(() => setShowNotifBanner(true), 800);
       }
     } else {
