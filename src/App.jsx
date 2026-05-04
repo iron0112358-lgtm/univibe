@@ -1540,7 +1540,7 @@ function NotificationBanner({ event, onClose }) {
       <div className="notif-banner-text">
         {done
           ? <strong>Notifications enabled! ✅</strong>
-          : <><strong>🔔 Stay updated!</strong> Get event reminders and new event alerts at KIU.</>
+          : <><strong>🔔 Stay updated!</strong><br/>Get event reminders and new event alerts at KIU.</>
         }
       </div>
       {!done && (
