@@ -169,17 +169,17 @@ const db = {
   async deleteAccount(userId) {
     return wrap(async () => {
       if (!_session?.token) return { error: "Sign in required." };
-      // Delete from public.users — auth entry becomes inactive ghost
-      const res = await fetch(`${SB_URL}/rest/v1/users?id=eq.${userId}`, {
-        method: "DELETE",
-        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session.token}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
+      const res = await fetch("https://hdnbrarxisehdmqtswqq.supabase.co/functions/v1/delete-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${_session.token}`,
+        },
       });
-      if (!res.ok) return { error: "Could not delete account." };
-      // Also delete event_attendees
-      await fetch(`${SB_URL}/rest/v1/event_attendees?user_id=eq.${userId}`, {
-        method: "DELETE",
-        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session.token}`, "Content-Type": "application/json" },
-      });
+      if (!res.ok) {
+        const err = await res.json();
+        return { error: err.error || "Could not delete account." };
+      }
       return { data: true };
     }, { error: "Could not delete account." });
   },
