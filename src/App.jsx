@@ -1539,15 +1539,15 @@ function NotificationBanner({ event, onClose }) {
       <div className="notif-banner-icon">{done ? "✅" : "🔔"}</div>
       <div className="notif-banner-text">
         {done
-          ? <strong>Reminder set! We'll notify you 24h before.</strong>
-          : <><strong>Get a reminder!</strong>We'll notify you 24h before this event starts.</>
+          ? <strong>Notifications enabled! ✅</strong>
+          : <><strong>🔔 Stay updated!</strong> Get event reminders and new event alerts at KIU.</>
         }
       </div>
       {!done && (
         <div className="notif-banner-btns">
           <button className="btn bsm bg" onClick={onClose}>Later</button>
           <button className="btn bsm bp" onClick={enable} disabled={asking}>
-            {asking ? "…" : "Remind Me 🔔"}
+            {asking ? "…" : "Allow 🔔"}
           </button>
         </div>
       )}
@@ -1631,7 +1631,12 @@ function HomePage({ user, onSelect, onRefresh, onShowAuth, onNotif }) {
     await load();
     if (a === "joined" && eventObj) {
       onRefresh("ok", "Joined! 🎉");
-      if (typeof onNotif === 'function') setTimeout(() => onNotif(eventObj), 1000);
+      if (typeof onNotif === 'function') {
+        // Only show banner if not already subscribed
+        const alreadyPrompted = localStorage.getItem("uv_notif_prompted");
+        if (!alreadyPrompted) setTimeout(() => onNotif(eventObj), 1000);
+        else if (eventObj) setTimeout(() => onNotif(eventObj), 1000); // show for reminder even if prompted
+      }
     } else {
       onRefresh("ok", "Left event.");
     }
@@ -2166,6 +2171,14 @@ function MyPage({ user, onSelect, onRefresh, onShowAuth }) {
             </div>
           </div>
           {isAdmin && <div className="profile-badge">⚡ Platform Admin</div>}
+          <button className="btn bsm" style={{ marginTop:8, background:"rgba(168,85,247,0.1)", color:"var(--purple)", border:"1px solid rgba(168,85,247,0.25)", borderRadius:100 }}
+            onClick={async () => {
+              const granted = await requestNotificationPermission();
+              if (granted) { localStorage.setItem("uv_notif_prompted","true"); onRefresh("ok","Notifications enabled! 🔔"); }
+              else onRefresh("error","Please allow notifications in your browser settings.");
+            }}>
+            🔔 Enable Notifications
+          </button>
         </div>
       </div>
 
@@ -2193,6 +2206,7 @@ export default function App() {
   const [tick, setTick]             = useState(0);
   const [booting, setBooting]       = useState(true);
   const [notifEvent, setNotifEvent] = useState(null);
+  const [showGeneralNotif, setShowGeneralNotif] = useState(false);
 
   // On first load: restore session + handle shared event links
   useEffect(() => {
@@ -2205,10 +2219,19 @@ export default function App() {
       if (eventId) {
         setSelId(eventId);
         setPage("detail");
-        // Clean URL without reload
         window.history.replaceState({}, "", window.location.pathname);
       }
       setBooting(false);
+      // First login notification prompt
+      if (restored) {
+        const prompted = localStorage.getItem("uv_notif_prompted");
+        if (!prompted) {
+          setTimeout(() => {
+            setNotifEvent(null); // show general banner not event-specific
+            setShowGeneralNotif(true);
+          }, 3000);
+        }
+      }
     })();
   }, []);
 
@@ -2255,6 +2278,12 @@ export default function App() {
         {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuth={u => { setUser(u); showToast("ok", `Welcome, ${u.name}! 🎓`); }} />}
         {toast && <Toast key={toast.k} msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
         {notifEvent && <NotificationBanner event={notifEvent} onClose={() => setNotifEvent(null)} />}
+        {showGeneralNotif && !notifEvent && (
+          <NotificationBanner event={null} onClose={() => {
+            localStorage.setItem("uv_notif_prompted", "true");
+            setShowGeneralNotif(false);
+          }} />
+        )}
       </div>
     </ErrorBoundary>
   );
