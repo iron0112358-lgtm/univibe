@@ -341,7 +341,24 @@ const db = {
         body: { title, description, location, category, date: d.toISOString(), max_participants: maxP, host_id: userId, is_private: data.is_private || false },
       });
       if (error) return { error };
-      return { data: Array.isArray(event) ? event[0] : event };
+      const createdEvent = Array.isArray(event) ? event[0] : event;
+
+      // Notify all subscribers about new public event (fire and forget)
+      if (!data.is_private && createdEvent?.id) {
+        fetch(`${SB_URL.replace("supabase.co", "supabase.co/functions/v1")}/notify-new-event`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event_id: createdEvent.id,
+            event_title: title,
+            event_category: category,
+            event_date: d.toISOString(),
+            is_private: false,
+          }),
+        }).catch(() => {}); // silent fail — notification is non-critical
+      }
+
+      return { data: createdEvent };
     }, { error: "Could not create event. Please try again." });
   },
 
