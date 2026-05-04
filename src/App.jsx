@@ -165,6 +165,24 @@ const db = {
   },
 
   signOut() { _session = null; clearSession(); },
+
+  async deleteAccount(userId) {
+    return wrap(async () => {
+      if (!_session?.token) return { error: "Sign in required." };
+      // Delete from public.users first
+      await fetch(`${SB_URL}/rest/v1/users?id=eq.${userId}`, {
+        method: "DELETE",
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session.token}`, "Content-Type": "application/json" },
+      });
+      // Delete from auth.users via Supabase auth API
+      const res = await fetch(`${SB_URL}/auth/v1/user`, {
+        method: "DELETE",
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session.token}`, "Content-Type": "application/json" },
+      });
+      if (!res.ok) return { error: "Could not delete account." };
+      return { data: true };
+    }, { error: "Could not delete account." });
+  },
   getSession() { return _session; },
 
   async refreshSession() {
@@ -2164,9 +2182,12 @@ function NotifStatusButton({ onRefresh }) {
 }
 
 function MyPage({ user, onSelect, onRefresh, onShowAuth }) {
-  const [tab,     setTab]     = useState("joined");
-  const [data,    setData]    = useState({ joined:[], created:[] });
-  const [loading, setLoading] = useState(true);
+  const [tab,       setTab]     = useState("joined");
+  const [data,      setData]    = useState({ joined:[], created:[] });
+  const [loading,   setLoading] = useState(true);
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
+  const [deleting,  setDeleting] = useState(false);
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
@@ -2215,6 +2236,44 @@ function MyPage({ user, onSelect, onRefresh, onShowAuth }) {
           <NotifStatusButton onRefresh={onRefresh} />
         </div>
       </div>
+
+      {/* Delete Account */}
+      {!showDelete ? (
+        <div style={{ textAlign:"center", marginBottom:16 }}>
+          <button onClick={() => setShowDelete(true)}
+            style={{ background:"none", border:"none", color:"var(--muted)", fontSize:12, cursor:"pointer", textDecoration:"underline" }}>
+            Delete my account
+          </button>
+        </div>
+      ) : (
+        <div style={{ background:"var(--bg2)", border:"1px solid rgba(239,68,68,0.3)", borderRadius:16, padding:20, marginBottom:20 }}>
+          <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:15, color:"var(--pink)", marginBottom:8 }}>
+            ⚠️ Delete Account
+          </div>
+          <div style={{ color:"var(--muted2)", fontSize:13, marginBottom:14, lineHeight:1.6 }}>
+            This will permanently delete your account and all your data. Type <strong>DELETE</strong> to confirm.
+          </div>
+          <input className="fi" placeholder="Type DELETE to confirm" value={deleteInput}
+            onChange={e => setDeleteInput(e.target.value)}
+            style={{ marginBottom:12 }} />
+          <div style={{ display:"flex", gap:10 }}>
+            <button className="btn bsm bg" onClick={() => { setShowDelete(false); setDeleteInput(""); }}>Cancel</button>
+            <button className="btn bsm" disabled={deleteInput !== "DELETE" || deleting}
+              onClick={async () => {
+                setDeleting(true);
+                const r = await db.deleteAccount(user.id);
+                if (r.error) { onRefresh("error", r.error); setDeleting(false); return; }
+                db.signOut();
+                localStorage.removeItem("uv_notif_prompted");
+                onRefresh("ok", "Account deleted.");
+                window.location.reload();
+              }}
+              style={{ background:"rgba(239,68,68,0.15)", color:"#ef4444", border:"1px solid rgba(239,68,68,0.3)", borderRadius:100 }}>
+              {deleting ? "Deleting…" : "Delete Forever"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="tabs">
         <button className={`tab ${tab==="joined"?"on":""}`} onClick={() => setTab("joined")}>🎟️ Joined ({data.joined.length})</button>
