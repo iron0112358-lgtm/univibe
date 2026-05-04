@@ -343,21 +343,6 @@ const db = {
       if (error) return { error };
       const createdEvent = Array.isArray(event) ? event[0] : event;
 
-      // Notify all subscribers about new public event (fire and forget)
-      if (!data.is_private && createdEvent?.id) {
-        fetch(`https://hdnbrarxisehdmqtswqq.supabase.co/functions/v1/notify-new-event`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            event_id: createdEvent.id,
-            event_title: title,
-            event_category: category,
-            event_date: d.toISOString(),
-            is_private: false,
-          }),
-        }).catch(() => {}); // silent fail — notification is non-critical
-      }
-
       return { data: createdEvent };
     }, { error: "Could not create event. Please try again." });
   },
