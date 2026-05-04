@@ -2132,6 +2132,43 @@ function CreatePage({ user, onBack, onShowAuth, onCreated }) {
 }
 
 // ─── My Events Page ───────────────────────────────────────────────────────────
+function NotifStatusButton({ onRefresh }) {
+  const [subscribed, setSubscribed] = useState(false);
+
+  useEffect(() => {
+    const check = async () => {
+      const prompted = localStorage.getItem("uv_notif_prompted");
+      const permission = window.OneSignal?.Notifications?.permission
+        ?? (await window.OneSignal?.isPushNotificationsEnabled?.())
+        ?? false;
+      setSubscribed(!!(prompted && permission));
+    };
+    check();
+  }, []);
+
+  if (subscribed) return (
+    <div style={{ marginTop:8, fontSize:12, color:"var(--lime)", fontWeight:600 }}>
+      🔔 Notifications Enabled ✅
+    </div>
+  );
+
+  return (
+    <button className="btn bsm" style={{ marginTop:8, background:"rgba(168,85,247,0.1)", color:"var(--purple)", border:"1px solid rgba(168,85,247,0.25)", borderRadius:100 }}
+      onClick={async () => {
+        const granted = await requestNotificationPermission();
+        if (granted) {
+          localStorage.setItem("uv_notif_prompted","true");
+          setSubscribed(true);
+          onRefresh("ok","Notifications enabled! 🔔");
+        } else {
+          onRefresh("error","Please allow notifications in your browser settings.");
+        }
+      }}>
+      🔔 Enable Notifications
+    </button>
+  );
+}
+
 function MyPage({ user, onSelect, onRefresh, onShowAuth }) {
   const [tab,     setTab]     = useState("joined");
   const [data,    setData]    = useState({ joined:[], created:[] });
@@ -2181,14 +2218,7 @@ function MyPage({ user, onSelect, onRefresh, onShowAuth }) {
             </div>
           </div>
           {isAdmin && <div className="profile-badge">⚡ Platform Admin</div>}
-          <button className="btn bsm" style={{ marginTop:8, background:"rgba(168,85,247,0.1)", color:"var(--purple)", border:"1px solid rgba(168,85,247,0.25)", borderRadius:100 }}
-            onClick={async () => {
-              const granted = await requestNotificationPermission();
-              if (granted) { localStorage.setItem("uv_notif_prompted","true"); onRefresh("ok","Notifications enabled! 🔔"); }
-              else onRefresh("error","Please allow notifications in your browser settings.");
-            }}>
-            🔔 Enable Notifications
-          </button>
+          <NotifStatusButton onRefresh={onRefresh} />
         </div>
       </div>
 
