@@ -1649,10 +1649,15 @@ function HomePage({ user, onSelect, onRefresh, onShowAuth, onNotif }) {
     if (a === "joined" && eventObj) {
       onRefresh("ok", "Joined! 🎉");
       if (typeof onNotif === 'function') {
-        // Only show banner if not already subscribed
         const alreadyPrompted = localStorage.getItem("uv_notif_prompted");
-        if (!alreadyPrompted) setTimeout(() => onNotif(eventObj), 1000);
-        else if (eventObj) setTimeout(() => onNotif(eventObj), 1000); // show for reminder even if prompted
+        // Only show banner for reminder if already prompted, never show general banner again
+        if (eventObj && alreadyPrompted) {
+          // Check if already subscribed - if yes skip banner entirely
+          const isSubscribed = window.OneSignal?.Notifications?.permission;
+          if (!isSubscribed) setTimeout(() => onNotif(eventObj), 1000);
+        } else if (!alreadyPrompted) {
+          setTimeout(() => onNotif(eventObj), 1000);
+        }
       }
     } else {
       onRefresh("ok", "Left event.");
