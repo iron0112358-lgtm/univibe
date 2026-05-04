@@ -345,7 +345,7 @@ const db = {
 
       // Notify all subscribers about new public event (fire and forget)
       if (!data.is_private && createdEvent?.id) {
-        fetch(`${SB_URL.replace("supabase.co", "supabase.co/functions/v1")}/notify-new-event`, {
+        fetch(`https://hdnbrarxisehdmqtswqq.supabase.co/functions/v1/notify-new-event`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
