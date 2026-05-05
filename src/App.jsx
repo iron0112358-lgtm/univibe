@@ -215,39 +215,36 @@ const db = {
 
   async getTrending() {
     return wrap(async () => {
-      // Get top 3 events by attendee count
-      const evRes = await fetch(
-        `${SB_URL}/rest/v1/events?select=id,title,description,date,location,category,host_id,max_participants,created_at,is_private&order=created_at.desc&limit=50`,
-        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-      );
-      const events = await evRes.json();
+      // Fetch events and attendee counts in parallel
+      const [events, att] = await Promise.all([
+        fetch(`${SB_URL}/rest/v1/events?select=id,title,description,date,location,category,host_id,max_participants,created_at,is_private&order=created_at.desc&limit=50`,
+          { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } })
+          .then(r => r.json()).catch(() => []),
+        fetch(`${SB_URL}/rest/v1/event_attendees?select=event_id&status=eq.approved`,
+          { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } })
+          .then(r => r.json()).catch(() => []),
+      ]);
+
       if (!Array.isArray(events) || events.length === 0) return [];
 
-      // Get attendee counts for all
-      const ids = events.map(e => e.id).join(",");
-      const attRes = await fetch(
-        `${SB_URL}/rest/v1/event_attendees?select=event_id&status=eq.approved&event_id=in.(${ids})`,
-        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-      );
-      const att = await attRes.json();
       const countMap = {};
       (att || []).forEach(r => { countMap[r.event_id] = (countMap[r.event_id] || 0) + 1; });
 
-      // Sort by count, take top 3
       const sorted = events
         .map(e => ({ ...e, attendee_count: countMap[e.id] || 0 }))
         .sort((a, b) => b.attendee_count - a.attendee_count)
         .slice(0, 3);
 
-      // Fetch host names
+      // Fetch host names for top 3 only
       const hostIds = [...new Set(sorted.map(e => e.host_id).filter(Boolean))];
-      let nameMap = {};
-      if (hostIds.length) {
-        const nRes = await fetch(`${SB_URL}/rest/v1/users?id=in.(${hostIds.join(",")})&select=id,name`,
-          { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } });
-        const names = await nRes.json();
-        (names || []).forEach(u => { nameMap[u.id] = u.name; });
-      }
+      const names = hostIds.length
+        ? await fetch(`${SB_URL}/rest/v1/users?id=in.(${hostIds.join(",")})&select=id,name`,
+            { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } })
+            .then(r => r.json()).catch(() => [])
+        : [];
+
+      const nameMap = {};
+      (names || []).forEach(u => { nameMap[u.id] = u.name; });
 
       return sorted.map(e => ({ ...e, host_name: nameMap[e.host_id] || "Unknown" }));
     }, []);
@@ -275,29 +272,27 @@ const db = {
 
       if (!res.ok || !Array.isArray(data)) return { data: [], total: 0 };
 
-      // Fetch host names separately
+      // Fetch host names AND attendee counts in parallel
       const hostIds = [...new Set((data || []).map(e => e.host_id).filter(Boolean))];
-      let nameMap = {};
-      if (hostIds.length > 0) {
-        const nRes = await fetch(
-          `${SB_URL}/rest/v1/users?id=in.(${hostIds.join(",")})&select=id,name`,
-          { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-        );
-        const names = await nRes.json();
-        (names || []).forEach(u => { nameMap[u.id] = u.name; });
-      }
-
-      // Get attendee counts for this batch
       const ids = (data || []).map(e => `"${e.id}"`).join(",");
-      let countMap = {};
-      if (ids.length) {
-        const attRes = await fetch(
-          `${SB_URL}/rest/v1/event_attendees?select=event_id&status=eq.approved&event_id=in.(${ids})`,
-          { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session?.token || SB_KEY}` } }
-        );
-        const att = await attRes.json();
-        (att || []).forEach(r => { countMap[r.event_id] = (countMap[r.event_id] || 0) + 1; });
-      }
+
+      const [names, att] = await Promise.all([
+        hostIds.length > 0
+          ? fetch(`${SB_URL}/rest/v1/users?id=in.(${hostIds.join(",")})&select=id,name`,
+              { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } })
+              .then(r => r.json()).catch(() => [])
+          : Promise.resolve([]),
+        ids.length
+          ? fetch(`${SB_URL}/rest/v1/event_attendees?select=event_id&status=eq.approved&event_id=in.(${ids})`,
+              { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } })
+              .then(r => r.json()).catch(() => [])
+          : Promise.resolve([]),
+      ]);
+
+      const nameMap = {};
+      (names || []).forEach(u => { nameMap[u.id] = u.name; });
+      const countMap = {};
+      (att || []).forEach(r => { countMap[r.event_id] = (countMap[r.event_id] || 0) + 1; });
 
       const events = (data || []).map(e => ({
         ...e,
