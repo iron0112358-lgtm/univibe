@@ -114,8 +114,32 @@ const db = {
       const { data: auth, error: authErr } = await sbAuth("signup", { email, password });
       if (authErr) return { error: authErr };
 
-      // Don't save to public.users yet — only save on first successful sign in
-      // This ensures only real verified emails get into the platform
+      // If Supabase returns access_token immediately (email confirmation OFF)
+      // log them in right away
+      if (auth?.access_token) {
+        const token = auth.access_token;
+        const userId = auth.user.id;
+        const name = nameFromEmail(email);
+        await fetch(`${SB_URL}/rest/v1/users`, {
+          method: "POST",
+          headers: {
+            "apikey": SB_KEY,
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal,resolution=ignore-duplicates",
+          },
+          body: JSON.stringify({ id: userId, name, email }),
+        });
+        _session = {
+          id: userId, email, name, token,
+          refresh_token: auth.refresh_token,
+          expires_at: Math.floor(Date.now() / 1000) + (auth.expires_in || 3600),
+        };
+        saveSession(_session);
+        return { data: _session };
+      }
+
+      // Email confirmation required — show verify/waiting screen
       return { data: "verify" };
     }, { error: "Sign up failed. Please try again." });
   },
@@ -1396,17 +1420,18 @@ function DoneScreen({ email, password, onAuth, onClose }) {
 
   return (
     <div style={{ textAlign:"center", padding:"8px 0 20px" }}>
-      <div style={{ fontSize:52, marginBottom:14 }}>🎓</div>
+      <div style={{ fontSize:48, marginBottom:14 }}>📬</div>
       <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:800, fontSize:20, marginBottom:8 }}>
         Welcome to UniVibe, {name}!
       </div>
-      <div style={{ color:"var(--muted2)", fontSize:13, lineHeight:1.75, marginBottom:28 }}>
-        Your account has been created.<br/>
-        We're signing you in automatically.
+      <div style={{ color:"var(--muted2)", fontSize:13, lineHeight:1.75, marginBottom:20 }}>
+        Check your KIU Outlook email — we sent you<br/>
+        a confirmation link. Click it to activate<br/>
+        your UniVibe account.
       </div>
 
       {/* Pulsing orb */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:12, marginBottom:20 }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:12, marginBottom:16 }}>
         <div style={{ display:"flex", gap:6 }}>
           {[0,1,2].map(i => (
             <div key={i} style={{
@@ -1426,8 +1451,8 @@ function DoneScreen({ email, password, onAuth, onClose }) {
         }
       `}</style>
 
-      <div style={{ color:"var(--muted)", fontSize:12, marginBottom:24, minHeight:18 }}>
-        {showManual ? "Taking longer than expected…" : `${msg}${dots}`}
+      <div style={{ color:"var(--muted)", fontSize:12, marginBottom:16, minHeight:18 }}>
+        {showManual ? "Already confirmed? Try signing in below." : `Waiting for confirmation${dots}`}
       </div>
 
       {showManual && (
@@ -1436,6 +1461,12 @@ function DoneScreen({ email, password, onAuth, onClose }) {
           {trying ? "Signing in…" : "Sign In Now →"}
         </button>
       )}
+
+      <div style={{ marginTop:16, color:"var(--muted)", fontSize:11, lineHeight:1.6, opacity:0.7 }}>
+        Can't find the email? Check your Outlook settings<br/>
+        and make sure you're receiving all messages,<br/>
+        not only "Focused" ones.
+      </div>
     </div>
   );
 }
