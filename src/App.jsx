@@ -67,7 +67,9 @@ function loadSession() {
 let _session = loadSession();
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const ADMIN_EMAIL = "chichinadze.sab@gmail.com";
+const ADMIN_EMAIL  = "chichinadze.sab@gmail.com";
+const ADMIN_EMAIL2 = "chichinadze.saba@kiu.edu.ge";
+const MOD_EMAILS   = ["dvali.marita@kiu.edu.ge", "kobiashvili.elisabed@kiu.edu.ge"];
 const VALID_CATS = ["Tech", "Sports", "Social", "Education", "Entrepreneurship"];
 const ALL_CATS   = ["All", ...VALID_CATS];
 const CAT_ICON   = { Tech:"⚡", Sports:"🏃", Social:"🎉", Education:"📚", Entrepreneurship:"🚀" };
@@ -1314,8 +1316,10 @@ function JoinBtnFull({ event, user, onAction }) {
 function ECard({ event, user, onSelect, onAction }) {
   const isNew     = Date.now() - new Date(event.created_at).getTime() < 172800000;
   const isHost    = user && event.host_id === user.id;
-  const isAdmin   = user && user.email === ADMIN_EMAIL;
-  const canDelete = isHost || isAdmin;
+  const isAdmin   = user && (user.email === ADMIN_EMAIL || user.email === ADMIN_EMAIL2);
+  const isMod     = user && MOD_EMAILS.includes(user.email);
+  const isStaff   = isAdmin || isMod;
+  const canDelete = isHost || isStaff;
   const pct       = capPct(event.attendee_count, event.max_participants);
   const barCls    = pct >= 100 ? "c-r" : pct >= 80 ? "c-o" : pct >= 50 ? "c-a" : "c-g";
 
@@ -1858,7 +1862,9 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
   const full     = event.attendee_count >= event.max_participants;
   const pct      = capPct(event.attendee_count, event.max_participants);
   const isHost   = user && event.host_id === user.id;
-  const isAdmin  = user && user.email === ADMIN_EMAIL;
+  const isAdmin  = user && (user.email === ADMIN_EMAIL || user.email === ADMIN_EMAIL2);
+  const isMod    = user && MOD_EMAILS.includes(user.email);
+  const isStaff  = isAdmin || isMod;
   const canDelete           = isHost || isAdmin;
   const canViewParticipants = isHost || isAdmin;
 
@@ -2224,7 +2230,8 @@ function MyPage({ user, onSelect, onRefresh, onShowAuth }) {
   if (!user) return <div className="page"><div className="container"><div className="empty"><div className="eico">🎟️</div><h3>Sign in to see your events</h3><button className="btn bp" style={{ marginTop:14 }} onClick={onShowAuth}>Sign In</button></div></div></div>;
 
   const list    = tab === "joined" ? data.joined : data.created;
-  const isAdmin = user.email === ADMIN_EMAIL;
+  const isAdmin = user.email === ADMIN_EMAIL || user.email === ADMIN_EMAIL2;
+  const isMod   = MOD_EMAILS.includes(user.email);
   const memberSince = new Date(user.created_at || Date.now()).getFullYear();
   const act  = async (a, eventObj) => {
     if (a === "auth")           { onShowAuth(); return; }
@@ -2259,6 +2266,7 @@ function MyPage({ user, onSelect, onRefresh, onShowAuth }) {
             </div>
           </div>
           {isAdmin && <div className="profile-badge">⚡ Platform Admin</div>}
+          {!isAdmin && isMod && <div className="profile-badge" style={{ background:"rgba(99,102,241,0.15)", color:"#818cf8", borderColor:"rgba(99,102,241,0.3)" }}>🛡️ Moderator</div>}
           <NotifStatusButton onRefresh={onRefresh} />
         </div>
       </div>
