@@ -316,7 +316,7 @@ const db = {
       ]);
 
       const nameMap = {};
-      (names || []).forEach(u => { nameMap[u.id] = u.name; });
+      (names || []).forEach(u => { nameMap[u.id] = u.name || nameFromEmail(u.email || ""); });
       const countMap = {};
       (att || []).forEach(r => { countMap[r.event_id] = (countMap[r.event_id] || 0) + 1; });
 
