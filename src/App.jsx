@@ -803,9 +803,9 @@ const css = `
   .ecard-banner::after{content:'';position:absolute;bottom:0;left:0;right:0;height:50px;background:linear-gradient(to bottom,transparent,rgba(0,0,0,0.45))}
   .ecard-banner-Tech{background:linear-gradient(135deg,rgba(49,46,129,0.7),rgba(124,58,237,0.7)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-tech.jpg');background-size:cover;background-position:center}
   .ecard-banner-Sports{background:linear-gradient(135deg,rgba(6,78,59,0.7),rgba(16,185,129,0.7)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-sports.jpg');background-size:cover;background-position:center}
-  .ecard-banner-Social{background:linear-gradient(135deg,#831843,#DB2777,#F472B6,#FB923C)}
-  .ecard-banner-Education{background:linear-gradient(135deg,#1E3A8A,#2563EB,#60A5FA,#22D3EE)}
-  .ecard-banner-Entrepreneurship{background:linear-gradient(135deg,#78350F,#D97706,#FB923C,#FCD34D)}
+  .ecard-banner-Social{background:linear-gradient(135deg,rgba(131,24,67,0.7),rgba(251,146,60,0.7)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-social.jpg');background-size:cover;background-position:center}
+  .ecard-banner-Education{background:linear-gradient(135deg,rgba(30,58,138,0.7),rgba(34,211,238,0.7)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-education.jpg');background-size:cover;background-position:center}
+  .ecard-banner-Entrepreneurship{background:linear-gradient(135deg,rgba(120,53,15,0.7),rgba(252,211,77,0.7)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-entrepreneurship.jpg');background-size:cover;background-position:center}
 
   /* Wavy ticket tear separator */
   .ecard-wave{width:100%;overflow:hidden;line-height:0;margin-top:-1px;position:relative;z-index:1}
@@ -987,9 +987,9 @@ const css = `
   .dcard-banner{height:160px;position:relative}
   .dcard-banner-Tech{background:linear-gradient(135deg,rgba(79,70,229,0.65),rgba(168,85,247,0.65)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-tech.jpg');background-size:cover;background-position:center}
   .dcard-banner-Sports{background:linear-gradient(135deg,rgba(5,150,105,0.65),rgba(163,230,53,0.65)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-sports.jpg');background-size:cover;background-position:center}
-  .dcard-banner-Social{background:linear-gradient(135deg,#DB2777,#F472B6,#FB923C)}
-  .dcard-banner-Education{background:linear-gradient(135deg,#2563EB,#60A5FA,#22D3EE)}
-  .dcard-banner-Entrepreneurship{background:linear-gradient(135deg,#D97706,#FB923C,#FCD34D)}
+  .dcard-banner-Social{background:linear-gradient(135deg,rgba(219,39,119,0.65),rgba(251,146,60,0.65)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-social.jpg');background-size:cover;background-position:center}
+  .dcard-banner-Education{background:linear-gradient(135deg,rgba(37,99,235,0.65),rgba(34,211,238,0.65)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-education.jpg');background-size:cover;background-position:center}
+  .dcard-banner-Entrepreneurship{background:linear-gradient(135deg,rgba(217,119,6,0.65),rgba(252,211,77,0.65)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-entrepreneurship.jpg');background-size:cover;background-position:center}
   .dcard-banner::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,transparent,rgba(22,22,28,0.8))}
   .dcard-banner-inner{position:absolute;bottom:0;left:0;right:0;padding:20px 24px;z-index:1;display:flex;justify-content:space-between;align-items:flex-end}
   .dcard-body{padding:24px}
