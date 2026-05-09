@@ -755,11 +755,11 @@ const css = `
 
   /* SPLIT HERO */
   .hero{padding:0;text-align:left}
-  .hero-split{display:grid;grid-template-columns:1fr 1fr;min-height:320px;border-bottom:1px solid var(--border);margin-bottom:36px;max-width:1200px;margin-left:auto;margin-right:auto;width:100%;position:relative;overflow:hidden;background-image:url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/dormpic.png');background-size:cover;background-position:center}
-  .hero-left{display:flex;align-items:center;justify-content:center;padding:48px 40px;position:relative;overflow:hidden;z-index:1}
-  .hero-split::before{content:'';position:absolute;inset:0;background:rgba(14,14,18,0.72);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:0;pointer-events:none}
+  .hero-split{display:grid;grid-template-columns:1fr 1fr;min-height:320px;border-bottom:1px solid var(--border);margin-bottom:36px;max-width:1200px;margin-left:auto;margin-right:auto;width:100%}
+  .hero-left{display:flex;align-items:center;justify-content:center;padding:48px 40px;position:relative;overflow:hidden}
+  .hero-left::before{content:'';position:absolute;inset:0;background:none;pointer-events:none}
   .hero-logo{height:480px;width:100%;max-width:100%;object-fit:contain;position:relative;z-index:1}
-  .hero-right{display:flex;flex-direction:column;justify-content:center;padding:48px 40px;position:relative;z-index:1}
+  .hero-right{display:flex;flex-direction:column;justify-content:center;padding:48px 40px}
   .hero-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);padding:6px 16px;border-radius:100px;font-size:12px;color:var(--purple);font-weight:600;margin-bottom:20px;width:fit-content;letter-spacing:0.02em}
   .hero h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(28px,4vw,52px);font-weight:800;line-height:1.05;letter-spacing:-2px;margin-bottom:14px;text-align:left}
   .hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--purple),var(--pink),var(--orange));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
