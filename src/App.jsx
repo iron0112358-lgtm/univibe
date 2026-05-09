@@ -67,7 +67,9 @@ function loadSession() {
 let _session = loadSession();
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const ADMIN_EMAIL = "chichinadze.sab@gmail.com";
+const ADMIN_EMAIL  = "chichinadze.sab@gmail.com";
+const ADMIN_EMAIL2 = "chichinadze.saba@kiu.edu.ge";
+const MOD_EMAILS   = ["dvali.marita@kiu.edu.ge", "kobiashvili.elisabed@kiu.edu.ge"];
 const VALID_CATS = ["Tech", "Sports", "Social", "Education", "Entrepreneurship"];
 const ALL_CATS   = ["All", ...VALID_CATS];
 const CAT_ICON   = { Tech:"⚡", Sports:"🏃", Social:"🎉", Education:"📚", Entrepreneurship:"🚀" };
@@ -114,8 +116,32 @@ const db = {
       const { data: auth, error: authErr } = await sbAuth("signup", { email, password });
       if (authErr) return { error: authErr };
 
-      // Don't save to public.users yet — only save on first successful sign in
-      // This ensures only real verified emails get into the platform
+      // If Supabase returns access_token immediately (email confirmation OFF)
+      // log them in right away
+      if (auth?.access_token) {
+        const token = auth.access_token;
+        const userId = auth.user.id;
+        const name = nameFromEmail(email);
+        await fetch(`${SB_URL}/rest/v1/users`, {
+          method: "POST",
+          headers: {
+            "apikey": SB_KEY,
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal,resolution=ignore-duplicates",
+          },
+          body: JSON.stringify({ id: userId, name, email }),
+        });
+        _session = {
+          id: userId, email, name, token,
+          refresh_token: auth.refresh_token,
+          expires_at: Math.floor(Date.now() / 1000) + (auth.expires_in || 3600),
+        };
+        saveSession(_session);
+        return { data: _session };
+      }
+
+      // Email confirmation required — show verify/waiting screen
       return { data: "verify" };
     }, { error: "Sign up failed. Please try again." });
   },
@@ -729,11 +755,11 @@ const css = `
 
   /* SPLIT HERO */
   .hero{padding:0;text-align:left}
-  .hero-split{display:grid;grid-template-columns:1fr 1fr;min-height:320px;border-bottom:1px solid var(--border);margin-bottom:36px;max-width:1200px;margin-left:auto;margin-right:auto;width:100%}
-  .hero-left{display:flex;align-items:center;justify-content:center;padding:48px 40px;position:relative;overflow:hidden}
-  .hero-left::before{content:'';position:absolute;inset:0;background:none;pointer-events:none}
+  .hero-split{display:grid;grid-template-columns:1fr 1fr;min-height:320px;border-bottom:1px solid var(--border);margin-bottom:36px;max-width:1200px;margin-left:auto;margin-right:auto;width:100%;position:relative;overflow:hidden;background-image:url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/dormpic.png');background-size:cover;background-position:center}
+  .hero-left{display:flex;align-items:center;justify-content:center;padding:48px 40px;position:relative;overflow:hidden;z-index:1}
+  .hero-split::before{content:'';position:absolute;inset:0;background:rgba(14,14,18,0.72);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:0;pointer-events:none}
   .hero-logo{height:480px;width:100%;max-width:100%;object-fit:contain;position:relative;z-index:1}
-  .hero-right{display:flex;flex-direction:column;justify-content:center;padding:48px 40px}
+  .hero-right{display:flex;flex-direction:column;justify-content:center;padding:48px 40px;position:relative;z-index:1}
   .hero-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);padding:6px 16px;border-radius:100px;font-size:12px;color:var(--purple);font-weight:600;margin-bottom:20px;width:fit-content;letter-spacing:0.02em}
   .hero h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(28px,4vw,52px);font-weight:800;line-height:1.05;letter-spacing:-2px;margin-bottom:14px;text-align:left}
   .hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--purple),var(--pink),var(--orange));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
@@ -1075,7 +1101,11 @@ const css = `
     .ccard{padding:20px 16px}.dcard-body{padding:18px 16px}
     .hero-split{grid-template-columns:1fr;padding:0;margin:0 auto;width:100%;box-sizing:border-box}
     .hero-left{border-right:none;border-bottom:none;padding:20px 20px;width:100%;box-sizing:border-box}
-    .hero-right{padding:20px 20px;box-sizing:border-box}
+    .hero-right{padding:20px 20px;box-sizing:border-box;text-align:center;align-items:center}
+    .hero-right h1{text-align:center}
+    .hero-right p{text-align:center}
+    .hero-btns{justify-content:center !important;align-items:center !important}
+    .stats{justify-content:center}
     .hero-logo{height:320px;max-width:85%}
     .hero h1{letter-spacing:-1px}
     .page{padding:0 0 80px}
@@ -1290,8 +1320,10 @@ function JoinBtnFull({ event, user, onAction }) {
 function ECard({ event, user, onSelect, onAction }) {
   const isNew     = Date.now() - new Date(event.created_at).getTime() < 172800000;
   const isHost    = user && event.host_id === user.id;
-  const isAdmin   = user && user.email === ADMIN_EMAIL;
-  const canDelete = isHost || isAdmin;
+  const isAdmin   = user && (user.email === ADMIN_EMAIL || user.email === ADMIN_EMAIL2);
+  const isMod     = user && MOD_EMAILS.includes(user.email);
+  const isStaff   = isAdmin || isMod;
+  const canDelete = isHost || isStaff;
   const pct       = capPct(event.attendee_count, event.max_participants);
   const barCls    = pct >= 100 ? "c-r" : pct >= 80 ? "c-o" : pct >= 50 ? "c-a" : "c-g";
 
@@ -1396,17 +1428,18 @@ function DoneScreen({ email, password, onAuth, onClose }) {
 
   return (
     <div style={{ textAlign:"center", padding:"8px 0 20px" }}>
-      <div style={{ fontSize:52, marginBottom:14 }}>🎓</div>
+      <div style={{ fontSize:48, marginBottom:14 }}>📬</div>
       <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontWeight:800, fontSize:20, marginBottom:8 }}>
         Welcome to UniVibe, {name}!
       </div>
-      <div style={{ color:"var(--muted2)", fontSize:13, lineHeight:1.75, marginBottom:28 }}>
-        Your account has been created.<br/>
-        We're signing you in automatically.
+      <div style={{ color:"var(--muted2)", fontSize:13, lineHeight:1.75, marginBottom:20 }}>
+        Check your KIU Outlook email — we sent you<br/>
+        a confirmation link. Click it to activate<br/>
+        your UniVibe account.
       </div>
 
       {/* Pulsing orb */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:12, marginBottom:20 }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:12, marginBottom:16 }}>
         <div style={{ display:"flex", gap:6 }}>
           {[0,1,2].map(i => (
             <div key={i} style={{
@@ -1426,8 +1459,8 @@ function DoneScreen({ email, password, onAuth, onClose }) {
         }
       `}</style>
 
-      <div style={{ color:"var(--muted)", fontSize:12, marginBottom:24, minHeight:18 }}>
-        {showManual ? "Taking longer than expected…" : `${msg}${dots}`}
+      <div style={{ color:"var(--muted)", fontSize:12, marginBottom:16, minHeight:18 }}>
+        {showManual ? "Already confirmed? Try signing in below." : `Waiting for confirmation${dots}`}
       </div>
 
       {showManual && (
@@ -1436,6 +1469,12 @@ function DoneScreen({ email, password, onAuth, onClose }) {
           {trying ? "Signing in…" : "Sign In Now →"}
         </button>
       )}
+
+      <div style={{ marginTop:16, color:"var(--muted)", fontSize:11, lineHeight:1.6, opacity:0.7 }}>
+        Can't find the email? Check your Outlook settings<br/>
+        and make sure you're receiving all messages,<br/>
+        not only "Focused" ones.
+      </div>
     </div>
   );
 }
@@ -1827,7 +1866,9 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
   const full     = event.attendee_count >= event.max_participants;
   const pct      = capPct(event.attendee_count, event.max_participants);
   const isHost   = user && event.host_id === user.id;
-  const isAdmin  = user && user.email === ADMIN_EMAIL;
+  const isAdmin  = user && (user.email === ADMIN_EMAIL || user.email === ADMIN_EMAIL2);
+  const isMod    = user && MOD_EMAILS.includes(user.email);
+  const isStaff  = isAdmin || isMod;
   const canDelete           = isHost || isAdmin;
   const canViewParticipants = isHost || isAdmin;
 
@@ -2193,7 +2234,8 @@ function MyPage({ user, onSelect, onRefresh, onShowAuth }) {
   if (!user) return <div className="page"><div className="container"><div className="empty"><div className="eico">🎟️</div><h3>Sign in to see your events</h3><button className="btn bp" style={{ marginTop:14 }} onClick={onShowAuth}>Sign In</button></div></div></div>;
 
   const list    = tab === "joined" ? data.joined : data.created;
-  const isAdmin = user.email === ADMIN_EMAIL;
+  const isAdmin = user.email === ADMIN_EMAIL || user.email === ADMIN_EMAIL2;
+  const isMod   = MOD_EMAILS.includes(user.email);
   const memberSince = new Date(user.created_at || Date.now()).getFullYear();
   const act  = async (a, eventObj) => {
     if (a === "auth")           { onShowAuth(); return; }
@@ -2228,6 +2270,7 @@ function MyPage({ user, onSelect, onRefresh, onShowAuth }) {
             </div>
           </div>
           {isAdmin && <div className="profile-badge">⚡ Platform Admin</div>}
+          {!isAdmin && isMod && <div className="profile-badge" style={{ background:"rgba(99,102,241,0.15)", color:"#818cf8", borderColor:"rgba(99,102,241,0.3)" }}>🛡️ Moderator</div>}
           <NotifStatusButton onRefresh={onRefresh} />
         </div>
       </div>
