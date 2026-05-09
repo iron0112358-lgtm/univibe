@@ -264,7 +264,7 @@ const db = {
       // Fetch host names for top 3 only
       const hostIds = [...new Set(sorted.map(e => e.host_id).filter(Boolean))];
       const names = hostIds.length
-        ? await fetch(`${SB_URL}/rest/v1/users?id=in.(${hostIds.join(",")})&select=id,name`,
+        ? await fetch(`${SB_URL}/rest/v1/users?id=in.(${hostIds.join(",")})&select=id,name,email`,
             { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } })
             .then(r => r.json()).catch(() => [])
         : [];
@@ -304,7 +304,7 @@ const db = {
 
       const [names, att] = await Promise.all([
         hostIds.length > 0
-          ? fetch(`${SB_URL}/rest/v1/users?id=in.(${hostIds.join(",")})&select=id,name`,
+          ? fetch(`${SB_URL}/rest/v1/users?id=in.(${hostIds.join(",")})&select=id,name,email`,
               { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } })
               .then(r => r.json()).catch(() => [])
           : Promise.resolve([]),
@@ -337,11 +337,11 @@ const db = {
       const evData = await evRes.json();
       if (!evRes.ok || !evData?.[0]) return null;
       const event = evData[0];
-      const nRes = await fetch(`${SB_URL}/rest/v1/users?id=eq.${event.host_id}&select=name`, {
+      const nRes = await fetch(`${SB_URL}/rest/v1/users?id=eq.${event.host_id}&select=name,email`, {
         headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
       });
       const nData = await nRes.json();
-      event.host_name = nData?.[0]?.name || "Unknown";
+      event.host_name = nData?.[0]?.name || (nData?.[0]?.email ? nameFromEmail(nData[0].email) : "Unknown");
 
       // Get attendee count — approved only
       const countRes = await fetch(
@@ -631,7 +631,7 @@ const db = {
       const hostIds = [...new Set(allEvents.map(e => e.host_id).filter(Boolean))];
       let nameMap = {};
       if (hostIds.length) {
-        const nRes = await fetch(`${SB_URL}/rest/v1/users?id=in.(${hostIds.join(",")})&select=id,name`,
+        const nRes = await fetch(`${SB_URL}/rest/v1/users?id=in.(${hostIds.join(",")})&select=id,name,email`,
           { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } });
         const names = await nRes.json();
         (names || []).forEach(u => { nameMap[u.id] = u.name; });
@@ -801,11 +801,11 @@ const css = `
   .ecard-banner::before{content:'';position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.07) 50%,transparent 60%);transform:translateX(-100%);transition:transform 0.6s ease}
   .ecard:hover .ecard-banner::before{transform:translateX(200%)}
   .ecard-banner::after{content:'';position:absolute;bottom:0;left:0;right:0;height:50px;background:linear-gradient(to bottom,transparent,rgba(0,0,0,0.45))}
-  .ecard-banner-Tech{background:linear-gradient(135deg,rgba(49,46,129,0.7),rgba(124,58,237,0.7)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-tech.jpg');background-size:cover;background-position:center}
-  .ecard-banner-Sports{background:linear-gradient(135deg,rgba(6,78,59,0.7),rgba(16,185,129,0.7)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-sports.jpg');background-size:cover;background-position:center}
-  .ecard-banner-Social{background:linear-gradient(135deg,rgba(131,24,67,0.7),rgba(251,146,60,0.7)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-social.jpg');background-size:cover;background-position:center}
-  .ecard-banner-Education{background:linear-gradient(135deg,rgba(30,58,138,0.7),rgba(34,211,238,0.7)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-education.jpg');background-size:cover;background-position:center}
-  .ecard-banner-Entrepreneurship{background:linear-gradient(135deg,rgba(120,53,15,0.7),rgba(252,211,77,0.7)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-entrepreneurship.jpg');background-size:cover;background-position:center}
+  .ecard-banner-Tech{background:linear-gradient(135deg,rgba(49,46,129,0.45),rgba(124,58,237,0.45)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-tech.jpg');background-size:cover;background-position:center}
+  .ecard-banner-Sports{background:linear-gradient(135deg,rgba(6,78,59,0.45),rgba(16,185,129,0.45)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-sports.jpg');background-size:cover;background-position:center}
+  .ecard-banner-Social{background:linear-gradient(135deg,rgba(131,24,67,0.45),rgba(251,146,60,0.45)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-social.jpg');background-size:cover;background-position:center}
+  .ecard-banner-Education{background:linear-gradient(135deg,rgba(30,58,138,0.45),rgba(34,211,238,0.45)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-education.jpg');background-size:cover;background-position:center}
+  .ecard-banner-Entrepreneurship{background:linear-gradient(135deg,rgba(120,53,15,0.45),rgba(252,211,77,0.45)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-entrepreneurship.jpg');background-size:cover;background-position:center}
 
   /* Wavy ticket tear separator */
   .ecard-wave{width:100%;overflow:hidden;line-height:0;margin-top:-1px;position:relative;z-index:1}
@@ -985,11 +985,11 @@ const css = `
   /* DETAIL CARD */
   .dcard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
   .dcard-banner{height:160px;position:relative}
-  .dcard-banner-Tech{background:linear-gradient(135deg,rgba(79,70,229,0.65),rgba(168,85,247,0.65)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-tech.jpg');background-size:cover;background-position:center}
-  .dcard-banner-Sports{background:linear-gradient(135deg,rgba(5,150,105,0.65),rgba(163,230,53,0.65)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-sports.jpg');background-size:cover;background-position:center}
-  .dcard-banner-Social{background:linear-gradient(135deg,rgba(219,39,119,0.65),rgba(251,146,60,0.65)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-social.jpg');background-size:cover;background-position:center}
-  .dcard-banner-Education{background:linear-gradient(135deg,rgba(37,99,235,0.65),rgba(34,211,238,0.65)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-education.jpg');background-size:cover;background-position:center}
-  .dcard-banner-Entrepreneurship{background:linear-gradient(135deg,rgba(217,119,6,0.65),rgba(252,211,77,0.65)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-entrepreneurship.jpg');background-size:cover;background-position:center}
+  .dcard-banner-Tech{background:linear-gradient(135deg,rgba(79,70,229,0.45),rgba(168,85,247,0.45)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-tech.jpg');background-size:cover;background-position:center}
+  .dcard-banner-Sports{background:linear-gradient(135deg,rgba(5,150,105,0.45),rgba(163,230,53,0.45)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-sports.jpg');background-size:cover;background-position:center}
+  .dcard-banner-Social{background:linear-gradient(135deg,rgba(219,39,119,0.45),rgba(251,146,60,0.45)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-social.jpg');background-size:cover;background-position:center}
+  .dcard-banner-Education{background:linear-gradient(135deg,rgba(37,99,235,0.45),rgba(34,211,238,0.45)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-education.jpg');background-size:cover;background-position:center}
+  .dcard-banner-Entrepreneurship{background:linear-gradient(135deg,rgba(217,119,6,0.45),rgba(252,211,77,0.45)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-entrepreneurship.jpg');background-size:cover;background-position:center}
   .dcard-banner::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,transparent,rgba(22,22,28,0.8))}
   .dcard-banner-inner{position:absolute;bottom:0;left:0;right:0;padding:20px 24px;z-index:1;display:flex;justify-content:space-between;align-items:flex-end}
   .dcard-body{padding:24px}
