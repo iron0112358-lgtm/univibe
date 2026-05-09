@@ -801,8 +801,8 @@ const css = `
   .ecard-banner::before{content:'';position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.07) 50%,transparent 60%);transform:translateX(-100%);transition:transform 0.6s ease}
   .ecard:hover .ecard-banner::before{transform:translateX(200%)}
   .ecard-banner::after{content:'';position:absolute;bottom:0;left:0;right:0;height:50px;background:linear-gradient(to bottom,transparent,rgba(0,0,0,0.45))}
-  .ecard-banner-Tech{background:linear-gradient(135deg,#312E81,#4F46E5,#7C3AED,#A855F7)}
-  .ecard-banner-Sports{background:linear-gradient(135deg,#064E3B,#059669,#10B981,#A3E635)}
+  .ecard-banner-Tech{background:linear-gradient(135deg,rgba(49,46,129,0.7),rgba(124,58,237,0.7)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-tech.jpg');background-size:cover;background-position:center}
+  .ecard-banner-Sports{background:linear-gradient(135deg,rgba(6,78,59,0.7),rgba(16,185,129,0.7)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-sports.jpg');background-size:cover;background-position:center}
   .ecard-banner-Social{background:linear-gradient(135deg,#831843,#DB2777,#F472B6,#FB923C)}
   .ecard-banner-Education{background:linear-gradient(135deg,#1E3A8A,#2563EB,#60A5FA,#22D3EE)}
   .ecard-banner-Entrepreneurship{background:linear-gradient(135deg,#78350F,#D97706,#FB923C,#FCD34D)}
@@ -985,8 +985,8 @@ const css = `
   /* DETAIL CARD */
   .dcard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
   .dcard-banner{height:160px;position:relative}
-  .dcard-banner-Tech{background:linear-gradient(135deg,#4F46E5,#7C3AED,#A855F7)}
-  .dcard-banner-Sports{background:linear-gradient(135deg,#059669,#10B981,#A3E635)}
+  .dcard-banner-Tech{background:linear-gradient(135deg,rgba(79,70,229,0.65),rgba(168,85,247,0.65)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-tech.jpg');background-size:cover;background-position:center}
+  .dcard-banner-Sports{background:linear-gradient(135deg,rgba(5,150,105,0.65),rgba(163,230,53,0.65)),url('https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/cat-sports.jpg');background-size:cover;background-position:center}
   .dcard-banner-Social{background:linear-gradient(135deg,#DB2777,#F472B6,#FB923C)}
   .dcard-banner-Education{background:linear-gradient(135deg,#2563EB,#60A5FA,#22D3EE)}
   .dcard-banner-Entrepreneurship{background:linear-gradient(135deg,#D97706,#FB923C,#FCD34D)}
