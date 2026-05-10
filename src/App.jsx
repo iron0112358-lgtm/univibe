@@ -919,8 +919,10 @@ const css = `
   .req-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
   .req-num{background:rgba(168,85,247,0.15);color:var(--purple);padding:3px 9px;border-radius:100px;font-size:12px;font-weight:800}
   .req-list{padding:0 18px 14px;display:flex;flex-direction:column;gap:8px}
-  .req-item{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg2);border-radius:12px;border:1px solid var(--border)}
-  .req-actions{display:flex;gap:6px;flex-shrink:0}
+  .req-item{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg2);border-radius:12px;border:1px solid var(--border);flex-wrap:wrap}
+  .req-info{flex:1;min-width:0}
+  .req-actions{display:flex;gap:6px;flex-shrink:0;margin-left:auto}
+  @media(max-width:480px){.req-item{flex-direction:column;align-items:flex-start}.req-actions{width:100%;justify-content:flex-end}.req-approve,.req-reject{flex:1;text-align:center;padding:8px 0}}
   .req-approve{background:rgba(163,230,53,0.12);color:var(--lime);border:1px solid rgba(163,230,53,0.25);padding:5px 12px;border-radius:100px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.16s}
   .req-approve:hover{background:rgba(163,230,53,0.22)}
   .req-reject{background:rgba(244,114,182,0.1);color:var(--pink);border:1px solid rgba(244,114,182,0.2);padding:5px 12px;border-radius:100px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.16s}
