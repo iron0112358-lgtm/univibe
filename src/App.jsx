@@ -1027,10 +1027,15 @@ const css = `
   .tab.on{background:var(--bg4);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,0.2)}
 
   /* EMPTY */
-  .empty{text-align:center;padding:64px 18px;color:var(--muted)}
-  .eico{font-size:48px;margin-bottom:12px;display:block}
-  .empty h3{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;color:var(--text);margin-bottom:7px}
-  .empty p{font-size:13px;line-height:1.65;max-width:280px;margin:0 auto}
+  .empty{text-align:center;padding:56px 24px;color:var(--muted);display:flex;flex-direction:column;align-items:center}
+  .eico{font-size:56px;margin-bottom:16px;display:block}
+  .empty h3{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px}
+  .empty p{font-size:13px;line-height:1.65;max-width:260px;margin:0 auto 20px}
+  .empty-btn{display:inline-flex;align-items:center;justify-content:center;width:100%;max-width:260px;padding:14px 0;border-radius:100px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;border:none;cursor:pointer;transition:opacity 0.2s}
+  .empty-btn:hover{opacity:0.85}
+  .empty-btn-lime{background:var(--lime);color:#0E0E12}
+  .empty-btn-purple{background:rgba(168,85,247,0.15);color:var(--purple);border:1px solid rgba(168,85,247,0.3) !important}
+  .empty-btn-muted{background:var(--bg3);color:var(--muted2);border:1px solid var(--border) !important}
 
   /* TOAST */
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:300;background:var(--bg2);border:1px solid var(--border2);border-radius:100px;padding:12px 20px;display:flex;align-items:center;gap:9px;box-shadow:0 8px 32px rgba(0,0,0,0.5);animation:tin 0.22s ease;font-size:13px;font-weight:500;white-space:nowrap}
@@ -1742,7 +1747,30 @@ function HomePage({ user, onSelect, onRefresh, onShowAuth, onNotif }) {
         <div className="filters">{ALL_CATS.map(c => <button key={c} className={`pill ${cat===c?"on":""}`} onClick={() => setCat(c)}>{c !== "All" ? CAT_ICON[c]+" " : ""}{c}</button>)}</div>
         {loading ? <Spinner />
           : events.length === 0
-          ? <div className="empty"><div className="eico">🔭</div><h3>No events yet</h3><p>{search || cat !== "All" ? "Try a different filter." : "Be the first to create an event!"}</p></div>
+          ? <div className="empty">
+              {search ? (
+                <>
+                  <div className="eico">🔍</div>
+                  <h3>No results for "{search}"</h3>
+                  <p>Try different keywords or browse all events</p>
+                  <button className="empty-btn empty-btn-muted" onClick={() => setSearch("")}>Clear Search ×</button>
+                </>
+              ) : cat !== "All" ? (
+                <>
+                  <div className="eico">{CAT_ICON[cat] || "🎯"}</div>
+                  <h3>No {cat} events yet</h3>
+                  <p>Be the first to host one!</p>
+                  <button className="empty-btn empty-btn-lime" onClick={() => { if(user) onSelect("create"); else onShowAuth(); }}>Host an Event →</button>
+                </>
+              ) : (
+                <>
+                  <div className="eico">🎓</div>
+                  <h3>No events yet</h3>
+                  <p>Be the first to bring the campus to life!</p>
+                  <button className="empty-btn empty-btn-lime" onClick={() => { if(user) onSelect("create"); else onShowAuth(); }}>Host an Event →</button>
+                </>
+              )}
+            </div>
           : <div className="grid">{events.map(e => <ECard key={e.id} event={e} user={user} onSelect={onSelect} onAction={act} />)}</div>
         }
         {!loading && pages > 1 && (
@@ -2319,7 +2347,23 @@ function MyPage({ user, onSelect, onRefresh, onShowAuth }) {
       </div>
       {loading ? <Spinner />
         : list.length === 0
-        ? <div className="empty"><div className="eico">{tab==="joined"?"🔍":"✨"}</div><h3>{tab==="joined"?"No events joined yet":"No events created yet"}</h3><p>{tab==="joined"?"Browse events and join something!":"Host your first campus event!"}</p></div>
+        ? <div className="empty">
+            {tab === "joined" ? (
+              <>
+                <div className="eico">🎟️</div>
+                <h3>No events joined yet</h3>
+                <p>Discover what's happening on campus and join something exciting!</p>
+                <button className="empty-btn empty-btn-purple" onClick={() => onSelect("events")}>Explore Events →</button>
+              </>
+            ) : (
+              <>
+                <div className="eico">✦</div>
+                <h3>Nothing hosted recently</h3>
+                <p>Ready to bring people together?</p>
+                <button className="empty-btn empty-btn-lime" onClick={() => onSelect("create")}>Host an Event →</button>
+              </>
+            )}
+          </div>
         : <div className="grid">{list.map(e => <ECard key={e.id} event={e} user={user} onSelect={onSelect} onAction={act} />)}</div>
       }
     </div></div>
