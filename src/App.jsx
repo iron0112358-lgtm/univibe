@@ -1167,12 +1167,12 @@ async function requestNotificationPermission() {
 
 async function getOneSignalPlayerId() {
   try {
-    if (!window.OneSignal) { console.log("❌ OneSignal not loaded"); return null; }
+    if (!window.OneSignal) return null;
     // Wait for OneSignal to be ready
     await new Promise(r => setTimeout(r, 500));
     // v16 SDK
     const subId = window.OneSignal.User?.PushSubscription?.id;
-    if (subId) { console.log("✅ Player ID (v16):", subId); return subId; }
+    if (subId) return subId;
     // Legacy
     const legacyId = await window.OneSignal.getUserId?.();
     if (legacyId) return legacyId;
@@ -1216,7 +1216,6 @@ async function scheduleEventReminder(event) {
 function removeEventReminder(eventId) {
   // OneSignal doesn't support canceling scheduled notifications on free tier
   // Reminder will fire but user has already left — acceptable tradeoff
-  console.log("Left event:", eventId);
 }
 
 // ─── Small Components ─────────────────────────────────────────────────────────
