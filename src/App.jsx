@@ -2189,7 +2189,7 @@ function CreatePage({ user, onBack, onShowAuth, onCreated }) {
           <div className="s2 fg"><label className="fl">Event Title *</label><input className="fi" placeholder="Give your event a catchy title" value={form.title} onChange={e => set("title", e.target.value)} maxLength={200} /></div>
           <div className="fg"><label className="fl">Category *</label><select className="fi" value={form.category} onChange={e => set("category", e.target.value)}>{VALID_CATS.map(c => <option key={c}>{c}</option>)}</select></div>
           <div className="fg"><label className="fl">Max Participants *</label><input className="fi" type="number" min={1} max={10000} value={form.max_participants} onChange={e => set("max_participants", e.target.value)} /></div>
-          <div className="fg"><label className="fl">Date & Time * <span style={{ color:"var(--muted)", fontWeight:400, fontSize:10 }}>(today → Dec 2030)</span></label><input className="fi" type="datetime-local" min={todayMin()} max={DATE_MAX} value={form.date} onChange={e => set("date", e.target.value)} /></div>
+          <div className="fg"><label className="fl">Date & Time *</label><input className="fi" type="datetime-local" min={todayMin()} max={DATE_MAX} value={form.date} onChange={e => set("date", e.target.value)} /></div>
           <div className="fg"><label className="fl">Location *</label><input className="fi" placeholder="e.g. Main Hall, Room 101" value={form.location} onChange={e => set("location", e.target.value)} maxLength={300} /></div>
           <div className="s2 fg"><label className="fl">Description *</label><textarea className="fi" rows={5} placeholder="Describe what attendees can expect…" value={form.description} onChange={e => set("description", e.target.value)} maxLength={2000} style={{ resize:"vertical" }} /></div>
           <div className="s2 fg">
@@ -2353,7 +2353,7 @@ function MyPage({ user, onSelect, onRefresh, onShowAuth }) {
                 <div className="eico">🎟️</div>
                 <h3>No events joined yet</h3>
                 <p>Discover what's happening on campus and join something exciting!</p>
-                <button className="empty-btn empty-btn-purple" onClick={() => onSelect("events")}>Explore Events →</button>
+                <button className="empty-btn empty-btn-purple" onClick={() => onSelect("home")}>Explore Events →</button>
               </>
             ) : (
               <>
