@@ -4,19 +4,37 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>UniVibe</title>
+    <title>UniVibe — Where Campus Comes Alive</title>
+    <meta name="description" content="Discover events, meet people, and make university actually worth it. KIU's campus social platform." />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://univibe.ge/" />
+    <meta property="og:title" content="UniVibe — Where Campus Comes Alive" />
+    <meta property="og:description" content="Discover events, meet people, and make university actually worth it. KIU's campus social platform." />
+    <meta property="og:image" content="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:site_name" content="UniVibe" />
+
+    <!-- Twitter/X -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="UniVibe — Where Campus Comes Alive" />
+    <meta name="twitter:description" content="Discover events, meet people, and make university actually worth it." />
+    <meta name="twitter:image" content="https://pub-d2b9c326a58845019dfb974ae3ee9e9a.r2.dev/univibelogo.png" />
+
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <script>
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(async function(OneSignal) {
-    await OneSignal.init({
-      appId: "d590965c-9ccb-47aa-b6af-43752244bd93",
-      notifyButton: { enable: false },
-      welcomeNotification: { disable: true },
-      allowLocalhostAsSecureOrigin: false,
-    });
-  });
-</script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function(OneSignal) {
+        await OneSignal.init({
+          appId: "d590965c-9ccb-47aa-b6af-43752244bd93",
+          notifyButton: { enable: false },
+          welcomeNotification: { disable: true },
+          allowLocalhostAsSecureOrigin: false,
+        });
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
