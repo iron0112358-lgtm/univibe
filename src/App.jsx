@@ -86,6 +86,30 @@ const DATE_MAX = "2030-12-31T23:59";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtDate = s => { try { return new Date(s).toLocaleDateString("en-US", { weekday:"short", month:"short", day:"numeric", year:"numeric" }); } catch { return ""; } };
 const fmtTime = s => { try { return new Date(s).toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit" }); } catch { return ""; } };
+
+function useCountdown(dateStr) {
+  const [label, setLabel] = useState("");
+  useEffect(() => {
+    const update = () => {
+      const diff = new Date(dateStr).getTime() - Date.now();
+      if (diff <= 0) {
+        const ended = Date.now() - new Date(dateStr).getTime();
+        setLabel(ended < 3 * 60 * 60 * 1000 ? "🟢 Happening now!" : "");
+        return;
+      }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      if (d > 0) setLabel(`⏰ Starts in ${d}d ${h}h`);
+      else if (h > 0) setLabel(`⏰ Starts in ${h}h ${m}m`);
+      else setLabel(`⏰ Starts in ${m}m`);
+    };
+    update();
+    const t = setInterval(update, 60000);
+    return () => clearInterval(t);
+  }, [dateStr]);
+  return label;
+}
 const capPct  = (n, m) => Math.min(100, m > 0 ? Math.round((n / m) * 100) : 0);
 const trunc   = (s, n = 120) => String(s || "").trim().slice(0, n);
 const wrap    = async (fn, fallback) => { try { return await fn(); } catch (e) { console.error(e); return fallback; } };
@@ -191,6 +215,49 @@ const db = {
   },
 
   signOut() { _session = null; clearSession(); },
+
+  async getReactions(eventId) {
+    return wrap(async () => {
+      const res = await fetch(
+        `${SB_URL}/rest/v1/event_reactions?event_id=eq.${eventId}&select=emoji,user_id`,
+        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+      );
+      const data = await res.json();
+      return data || [];
+    }, []);
+  },
+
+  async toggleReaction(eventId, userId, emoji) {
+    return wrap(async () => {
+      if (!_session?.token) return { error: "Sign in required." };
+      // Check if already reacted with this emoji
+      const chkRes = await fetch(
+        `${SB_URL}/rest/v1/event_reactions?event_id=eq.${eventId}&user_id=eq.${userId}&emoji=eq.${emoji}&select=id`,
+        { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session.token}` } }
+      );
+      const existing = await chkRes.json();
+      if (existing?.[0]?.id) {
+        // Remove reaction
+        await fetch(`${SB_URL}/rest/v1/event_reactions?id=eq.${existing[0].id}`, {
+          method: "DELETE",
+          headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session.token}` },
+        });
+        return { data: "removed" };
+      }
+      // Remove any other reaction from this user on this event first
+      await fetch(`${SB_URL}/rest/v1/event_reactions?event_id=eq.${eventId}&user_id=eq.${userId}`, {
+        method: "DELETE",
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session.token}` },
+      });
+      // Add new reaction
+      await fetch(`${SB_URL}/rest/v1/event_reactions`, {
+        method: "POST",
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${_session.token}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
+        body: JSON.stringify({ event_id: eventId, user_id: userId, emoji }),
+      });
+      return { data: "added" };
+    }, { error: "Could not react." });
+  },
 
   async deleteAccount(userId) {
     return wrap(async () => {
@@ -952,6 +1019,14 @@ const css = `
   .edit-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;color:var(--lime)}
   .edit-body{padding:0 18px 18px;display:flex;flex-direction:column;gap:12px}
 
+  /* REACTIONS */
+  .reactions{display:flex;gap:6px;margin:8px 0 4px;flex-wrap:wrap}
+  .rxn-btn{display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:100px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;font-size:12px;font-weight:600;color:var(--muted2);transition:all 0.16s;user-select:none}
+  .rxn-btn:hover{border-color:var(--purple);color:var(--text)}
+  .rxn-btn.rxn-active{background:rgba(168,85,247,0.15);border-color:rgba(168,85,247,0.4);color:var(--purple)}
+  .rxn-count{font-size:11px;color:var(--muted)}
+  .countdown{font-size:11px;color:var(--lime);font-weight:600;margin-bottom:4px}
+
   /* PARTICIPANTS PANEL */
   .part-panel{margin-top:20px;background:var(--bg3);border-radius:16px;overflow:hidden;border:1px solid var(--border)}
   .part-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:pointer;transition:background 0.16s}
@@ -1322,6 +1397,47 @@ function JoinBtnFull({ event, user, onAction }) {
   return                      <button className="btn bp" style={base} onClick={click}>✦ Join Event</button>;
 }
 
+function CountdownLabel({ date }) {
+  const label = useCountdown(date);
+  if (!label) return null;
+  return <div className="countdown">{label}</div>;
+}
+
+const REACTIONS = ["🔥", "🎉", "👀"];
+
+function ReactionsBar({ event, user }) {
+  const [rxns, setRxns] = useState([]);
+
+  useEffect(() => {
+    db.getReactions(event.id).then(setRxns);
+  }, [event.id]);
+
+  const counts = REACTIONS.reduce((acc, e) => {
+    acc[e] = rxns.filter(r => r.emoji === e).length;
+    return acc;
+  }, {});
+
+  const userRxn = user ? rxns.find(r => r.user_id === user.id)?.emoji : null;
+
+  const toggle = async (e, emoji) => {
+    e.stopPropagation();
+    if (!user) return;
+    await db.toggleReaction(event.id, user.id, emoji);
+    db.getReactions(event.id).then(setRxns);
+  };
+
+  return (
+    <div className="reactions">
+      {REACTIONS.map(emoji => (
+        <button key={emoji} className={`rxn-btn${userRxn === emoji ? " rxn-active" : ""}`}
+          onClick={e => toggle(e, emoji)}>
+          {emoji} <span className="rxn-count">{counts[emoji] || 0}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ECard({ event, user, onSelect, onAction }) {
   const isNew     = Date.now() - new Date(event.created_at).getTime() < 172800000;
   const isHost    = user && event.host_id === user.id;
@@ -1372,6 +1488,10 @@ function ECard({ event, user, onSelect, onAction }) {
           <div className="emr">📅 {fmtDate(event.date)} · {fmtTime(event.date)}</div>
           <div className="emr">📍 {trunc(event.location, 60)}</div>
           <div className="emr">👤 {trunc(event.host_name, 40)}</div>
+          <CountdownLabel date={event.date} />
+        </div>
+        <div onClick={e => e.stopPropagation()}>
+          <ReactionsBar event={event} user={user} />
         </div>
       </div>
       <div className="ecard-footer">
@@ -2026,6 +2146,7 @@ function DetailPage({ eventId, user, onBack, onShowAuth, onRefresh }) {
           <div className="dgrid">
             <div className="di"><div className="di-l">Date</div><div className="di-v">📅 {fmtDate(event.date)}</div></div>
             <div className="di"><div className="di-l">Time</div><div className="di-v">🕐 {fmtTime(event.date)}</div></div>
+            <CountdownLabel date={event.date} />
             <div className="di"><div className="di-l">Location</div><div className="di-v">📍 {event.location}</div></div>
             <div className="di"><div className="di-l">Host</div><div className="di-v">👤 {event.host_name}</div></div>
           </div>
