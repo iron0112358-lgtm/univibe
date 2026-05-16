@@ -100,8 +100,8 @@ function useCountdown(dateStr) {
       const d = Math.floor(diff / 86400000);
       const h = Math.floor((diff % 86400000) / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
-      if (d > 0) setLabel(`⏰ Starts in ${d}d ${h}h`);
-      else if (h > 0) setLabel(`⏰ Starts in ${h}h ${m}m`);
+      if (d > 0) setLabel(h > 0 ? `⏰ Starts in ${d}d ${h}h` : `⏰ Starts in ${d}d`);
+      else if (h > 0) setLabel(m > 0 ? `⏰ Starts in ${h}h ${m}m` : `⏰ Starts in ${h}h`);
       else setLabel(`⏰ Starts in ${m}m`);
     };
     update();
